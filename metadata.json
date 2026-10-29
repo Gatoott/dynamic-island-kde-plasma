@@ -1,0 +1,27 @@
+{
+    "KPlugin": {
+        "Authors": [
+            {
+                "Email": "gatot@linux.local",
+                "Name": "Gatot"
+            }
+        ],
+        "Category": "System Information",
+        "Description": "Dynamic Island pill with fluid transitions, quick controls, and modular hub for KDE Plasma 6",
+        "Icon": "preferences-desktop-display",
+        "Id": "org.kde.plasma.dynamicisland",
+        "License": "GPLv3",
+        "Name": "Plasma Dynamic Island",
+        "Version": "1.0.0",
+        "Website": "https://github.com/plasma-dynamic-island"
+    },
+    "KPackageStructure": "Plasma/Applet",
+    "X-Plasma-API-Minimum-Version": "6.0",
+    "X-Plasma-FormFactors": [
+        "panel",
+        "desktop"
+    ],
+    "X-Plasma-Provides": [
+        "org.kde.plasma.multimediacontrols"
+    ]
+}

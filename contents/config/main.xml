@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kcfg xmlns="http://www.kde.org/standards/kcfg/1.0"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="http://www.kde.org/standards/kcfg/1.0
+      http://www.kde.org/standards/kcfg/1.0/kcfg.xsd">
+  <kcfgfile/>
+  <group name="General">
+    <!-- Dimensions -->
+    <entry name="compactWidth" type="Int">
+      <default>165</default>
+    </entry>
+    <entry name="compactHeight" type="Int">
+      <default>36</default>
+    </entry>
+    <entry name="expandedWidth" type="Int">
+      <default>420</default>
+    </entry>
+    <entry name="expandedHeight" type="Int">
+      <default>325</default>
+    </entry>
+    <entry name="borderRadius" type="Int">
+      <default>18</default>
+    </entry>
+    <entry name="islandPadding" type="Int">
+      <default>12</default>
+    </entry>
+    <entry name="islandShapeMode" type="String">
+      <default>notch</default>
+    </entry>
+    <entry name="verticalOffset" type="Int">
+      <default>0</default>
+    </entry>
+    <entry name="horizontalOffset" type="Int">
+      <default>0</default>
+    </entry>
+    <entry name="clockFontSize" type="Int">
+      <default>13</default>
+    </entry>
+    <entry name="notchCornerRadius" type="Int">
+      <default>18</default>
+    </entry>
+
+    <!-- Appearance -->
+    <entry name="backgroundColor" type="Color">
+      <default>#0d0f12</default>
+    </entry>
+    <entry name="backgroundOpacity" type="Double">
+      <default>0.92</default>
+    </entry>
+    <entry name="enableBlur" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="borderColor" type="Color">
+      <default>#33ffffff</default>
+    </entry>
+    <entry name="accentColor" type="Color">
+      <default>#3daee9</default>
+    </entry>
+
+    <!-- Interaction -->
+    <entry name="expandOnHover" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="notificationDuration" type="Int">
+      <default>4500</default>
+    </entry>
+
+    <!-- Modular Toggles -->
+    <entry name="showVisualizer" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableMediaTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableSysMonitorTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableNotificationTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableClipboardTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="enableLauncherTab" type="Bool">
+      <default>true</default>
+    </entry>
+  </group>
+</kcfg>
