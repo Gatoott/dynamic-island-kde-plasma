@@ -102,7 +102,7 @@ PlasmoidItem {
             return root.currentCompactWidth;
         }
         if (root.currentExpandedTab === 1 && root.showLyrics) {
-            return 620;
+            return 640;
         }
         return root.cfgExpandedWidth;
     }

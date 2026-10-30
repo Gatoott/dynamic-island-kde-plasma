@@ -127,7 +127,7 @@ Item {
     function getTargetWidthForTab(tabIndex, lyricsActive) {
         var key = activeTabKey;
         if (key === "media" || tabIndex === 1) {
-            return lyricsActive ? 620 : 540;
+            return lyricsActive ? 640 : 540;
         }
         if (key === "control" || tabIndex === 0) {
             return 520;
@@ -587,6 +587,7 @@ Item {
                         lyricsFontBold: unifiedNotchRoot.cfgLyricsFontBold
                         currentTimeString: unifiedNotchRoot.currentTimeString
                         currentDateString: unifiedNotchRoot.currentDateString
+                        clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
 
                         onRequestPlayPause: unifiedNotchRoot.requestPlayPause()
                         onRequestNext: unifiedNotchRoot.requestNext()
