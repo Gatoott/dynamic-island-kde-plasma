@@ -111,56 +111,79 @@ Berikut adalah tampilan antarmuka dan berbagai mode interaksi dari Plasma Dynami
 
 ---
 
-## Dependencies
+## Installation Guide (Panduan Instalasi dari Nol)
 
-Sebelum menginstal widget ini, pastikan sistem Anda telah memenuhi dependensi berikut:
+Ikuti langkah-langkah praktis berikut untuk menginstal dan menjalankan Plasma Dynamic Island di desktop KDE Plasma 6 kamu:
 
-- **KDE Plasma:** Versi 6.0 atau yang lebih baru
-- **Qt 6 Framework:**
-  - `QtQuick` & `QtQuick.Layouts`
-  - `QtQuick.Shapes`
-  - `org.kde.kirigami`
-  - `org.kde.plasma.core` & `org.kde.plasma.plasmoid`
-- **System Utilities:**
-  - `libnotify` (untuk integrasi event notifikasi D-Bus)
-  - `playerctl` atau pemutar musik yang mendukung spesifikasi **MPRIS D-Bus** (misal: Spotify, Elisa, VLC, Cider, Amberol, dll.)
+### Langkah 1: Install Dependencies
+
+Buka terminal (**Konsole**), lalu jalankan perintah instalasi paket sesuai distribusi Linux yang kamu gunakan:
+
+#### 🔹 Arch Linux / Manjaro / EndeavourOS
+```bash
+sudo pacman -S --needed git qt6-declarative qt6-5compat kirigami libnotify playerctl
+```
+
+#### 🔹 Ubuntu / Kubuntu / Debian / KDE neon
+```bash
+sudo apt update && sudo apt install -y git qml6-module-qtquick qml6-module-qtquick-shapes qml6-module-org-kde-kirigami libnotify-bin playerctl
+```
+
+#### 🔹 Fedora / Nobara
+```bash
+sudo dnf install -y git qt6-qtdeclarative qt6-qt5compat kf6-kirigami libnotify playerctl
+```
+
+#### 🔹 openSUSE (Tumbleweed / Leap)
+```bash
+sudo zypper install -y git qt6-declarative kirigami-imports libnotify playerctl
+```
 
 ---
 
-## Installation Guide
+### Langkah 2: Clone Repositori (Langsung ke Folder Plasmoid)
 
-### Opsi 1: Instalasi Cepat via Symlink (Rekomendasi Pengembang)
-
-Clone repositori ini dan buat tautan simbolik (*symlink*) ke direktori plasmoids pengguna:
+Jalankan perintah ini di terminal. Widget akan langsung di-clone ke direktori plasmoids KDE Plasma tanpa perlu pusing mengatur symlink manual:
 
 ```bash
-# 1. Clone repositori ke direktori pilihan Anda
-git clone https://github.com/Gatoott/dynamic-island-kde-plasma.git ~/dynamic-island
-
-# 2. Buat folder plasmoids lokal jika belum ada
+# Buat folder plasmoid jika belum ada, lalu clone langsung
 mkdir -p ~/.local/share/plasma/plasmoids
-
-# 3. Buat symlink ke direktori plasmoid KDE Plasma
-ln -s ~/dynamic-island ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland
+git clone https://github.com/Gatoott/dynamic-island-kde-plasma.git ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland
 ```
 
-### Opsi 2: Instalasi Manual via `kpackagetool6`
+---
 
-Anda juga dapat menginstal paket plasmoid secara langsung menggunakan tool paket KDE Plasma 6:
+### Langkah 3: Muat Ulang Plasma (Restart Plasmashell)
+
+Bersihkan cache QML lama dan restart plasmashell agar KDE langsung mengenali widget baru:
 
 ```bash
-# Instal plasmoid langsung dari folder sumber
-kpackagetool6 --type Plasma/Applet --install /path/to/dynamic-island
-
-# Jika ingin memperbarui versi yang sudah ada:
-kpackagetool6 --type Plasma/Applet --upgrade /path/to/dynamic-island
+rm -rf ~/.cache/qmlcache* ~/.cache/plasma* && systemctl --user restart plasma-plasmashell
 ```
 
-### Menambahkan Widget ke Desktop / Panel
+---
 
-1. Klik kanan pada panel atas atau desktop Anda, lalu pilih **"Add Widgets..."** (*Tambahkan Widget...*).
-2. Cari **"Plasma Dynamic Island"**.
-3. Tarik (*drag & drop*) widget ke bagian tengah panel atas layar Anda.
+### Langkah 4: Tambahkan Widget ke Panel Layar
+
+1. **Klik kanan** pada Panel Atas (*Top Panel*) atau Desktop kamu.
+2. Pilih **"Add Widgets..."** (*Tambahkan Widget...*).
+3. Cari **"Plasma Dynamic Island"**.
+4. Tarik (*drag & drop*) widget tersebut ke posisi tengah panel atas layar kamu.
+5. Selesai! Dynamic Island sudah aktif dan siap digunakan. 🎉
+
+---
+
+### 💡 Tips: Update & Uninstall
+
+- **Cara Update ke Versi Terbaru:**
+  ```bash
+  cd ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland && git pull && systemctl --user restart plasma-plasmashell
+  ```
+
+- **Cara Uninstall (Hapus Widget):**
+  ```bash
+  rm -rf ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland && systemctl --user restart plasma-plasmashell
+  ```
 
 ---
 
