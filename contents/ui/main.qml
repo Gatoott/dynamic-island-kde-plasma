@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
+import QtQuick.Shapes
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
@@ -19,7 +20,7 @@ PlasmoidItem {
     Plasmoid.backgroundHints: PlasmaCore.Types.NoBackground
 
     // --- Configurations ---
-    readonly property int cfgCompactWidth: Plasmoid.configuration.compactWidth || 145
+    readonly property int cfgCompactWidth: Plasmoid.configuration.compactWidth || 180
     readonly property int cfgCompactHeight: Plasmoid.configuration.compactHeight || 36
     readonly property int cfgExpandedWidth: Plasmoid.configuration.expandedWidth || 420
     readonly property int cfgExpandedHeight: Plasmoid.configuration.expandedHeight || 335
@@ -63,12 +64,22 @@ PlasmoidItem {
         return root.isPlaying ? root.cfgCompactWidth + 30 : root.cfgCompactWidth;
     }
 
+    readonly property int currentNotchWidth: {
+        if (!root.isExpanded) {
+            return root.currentCompactWidth;
+        }
+        if (root.currentExpandedTab === 1 && root.showLyrics) {
+            return 680;
+        }
+        return root.cfgExpandedWidth;
+    }
+
     preferredRepresentation: compactRepresentation
-    Layout.preferredWidth: (!root.inPanel) ? desktopLivingNotch.width : compactPill.width
+    Layout.preferredWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + 32)
     Layout.preferredHeight: (!root.inPanel) ? desktopLivingNotch.height : root.cfgCompactHeight
     Layout.minimumWidth: 100
     Layout.maximumHeight: root.inPanel ? root.cfgCompactHeight : 10000
-    implicitWidth: (!root.inPanel) ? desktopLivingNotch.width : compactPill.width
+    implicitWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + 32)
     implicitHeight: (!root.inPanel) ? desktopLivingNotch.height : root.cfgCompactHeight
 
     TextMetrics {
@@ -441,72 +452,52 @@ PlasmoidItem {
         }
     }
 
-    // --- State Machine for Fluid Spring Animations & Overlay Canvas ---
-    property bool dialogVisible: false
-    property bool notchExpanding: false
+    // --- Independent Window Surface State (NON-REACTIVE TO isExpanded) ---
+    property bool dialogSurfaceOpen: false
 
-    Timer {
-        id: expandSpringTimer
-        interval: 16
-        repeat: false
-        onTriggered: {
-            root.notchExpanding = true;
-        }
-    }
-
-    Timer {
-        id: collapseTimer
-        interval: 360
-        repeat: false
-        onTriggered: {
-            root.dialogVisible = false;
-            root.isExpanded = false;
+    function openNotch() {
+        root.activeNotificationPill = false;
+        root.activeBatteryPill = false;
+        if (root.inPanel) {
+            root.dialogSurfaceOpen = true; // Munculkan kanvas transparan terlebih dahulu
+            root.isExpanded = true;        // Baru picu animasi melar targetH & targetW ke bawah
+        } else {
+            root.isExpanded = true;
         }
     }
 
     function expandNotch() {
-        root.activeNotificationPill = false;
-        root.activeBatteryPill = false;
-        if (root.inPanel) {
-            collapseTimer.stop();
-            root.dialogVisible = true;
-            root.isExpanded = true;
-            expandSpringTimer.restart();
-        } else {
-            root.isExpanded = true;
-            root.notchExpanding = true;
-        }
+        openNotch();
     }
 
     function collapseNotch() {
-        if (root.inPanel) {
-            expandSpringTimer.stop();
-            root.notchExpanding = false;
-            collapseTimer.restart();
-        } else {
-            root.isExpanded = false;
-            root.notchExpanding = false;
-        }
+        triggerCollapseSequence();
+    }
+
+    function triggerCollapseSequence() {
+        if (!root.isExpanded) return;
+
+        console.log("[NOTCH] T=0ms: Mulai animasi ciut fisik...");
+        root.isExpanded = false; // Ini HANYA memicu targetH -> compactHeight (36)
+        // DIALOG TETAP DIBIARKAN HIDUP: dialogSurfaceOpen TETAP true!
     }
 
     function toggleExpanded() {
         if (!root.isExpanded) {
-            expandNotch();
+            openNotch();
         } else {
-            collapseNotch();
+            triggerCollapseSequence();
         }
     }
 
     // ==============================================================
-    // 1. IN-PANEL COMPACT PILL (Trigger & Standby Indicator)
+    // 1. IN-PANEL COMPACT NOTCH (Single Unified Contour Pill)
     // Berada di dalam containment panel KDE
     // ==============================================================
-    Rectangle {
-        id: compactPill
-        clip: true
-
-        visible: root.inPanel
-        width: root.currentCompactWidth
+    Item {
+        id: panelNotchContainer
+        visible: root.inPanel && !root.dialogSurfaceOpen
+        width: panelCompactNotch.width
         height: root.cfgCompactHeight
 
         anchors.top: parent.top
@@ -514,156 +505,97 @@ PlasmoidItem {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
-        color: root.cfgBgColor
-        border.color: root.cfgBorderColor
-        border.width: 1
+        // Switch opacity secara instan saat dialog overlay terbuka/tertutup
+        // TANPA Behavior on opacity agar tidak ada desinkronisasi atau celah waktu
+        opacity: root.dialogSurfaceOpen ? 0.0 : 1.0
+        enabled: !root.dialogSurfaceOpen
 
-        topLeftRadius: 0
-        topRightRadius: 0
-        bottomLeftRadius: (root.isExpanded && root.inPanel) ? 0 : 16
-        bottomRightRadius: (root.isExpanded && root.inPanel) ? 0 : 16
-        Behavior on bottomLeftRadius { NumberAnimation { duration: 180 } }
-        Behavior on bottomRightRadius { NumberAnimation { duration: 180 } }
-
-        Behavior on width {
-            NumberAnimation { duration: 320; easing.type: Easing.OutBack; easing.overshoot: 1.25 }
-        }
-
-        // --- Subtle Top Glow Edge (Nusa 1.1 Style) ---
-        Rectangle {
+        CompactView {
+            id: panelCompactNotch
             anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: 2
-            opacity: 0.8
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: Qt.rgba(0.2, 0.4, 0.9, 0.0) }
-                GradientStop { position: 0.3; color: Qt.rgba(0.4, 0.45, 1.0, 0.5) }
-                GradientStop { position: 0.5; color: Qt.rgba(0.55, 0.4, 1.0, 0.65) }
-                GradientStop { position: 0.7; color: Qt.rgba(0.4, 0.45, 1.0, 0.5) }
-                GradientStop { position: 1.0; color: Qt.rgba(0.2, 0.4, 0.9, 0.0) }
-            }
-        }
+            anchors.horizontalCenter: parent.horizontalCenter
 
-        // Compact State Contents
-        Item {
-            id: compactState
-            anchors.top: parent.top
-            anchors.left: parent.left
-            anchors.right: parent.right
-            height: root.cfgCompactHeight
+            notchW: root.currentCompactWidth
+            notchH: root.cfgCompactHeight
+            wingR: 14
+            cornerR: 18
 
-            visible: opacity > 0
-            opacity: (root.isExpanded && root.inPanel) ? 0.3 : 1.0
-            Behavior on opacity { NumberAnimation { duration: 200 } }
+            cfgAccentColor: root.cfgAccentColor
+            cfgBgColor: root.cfgBgColor
+            cfgBorderColor: root.cfgBorderColor
+            cfgClockFontSize: root.cfgClockFontSize
+            cfgShowVisualizer: root.cfgShowVisualizer
 
-            // State 1: Notification Pill
-            NotificationPill {
-                anchors.fill: parent
-                visible: opacity > 0
-                opacity: root.activeNotificationPill ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-                appName: root.notifAppName
-                appIcon: root.notifIcon
-                summary: root.notifSummary
-                body: root.notifBody
-            }
+            // Compact state bindings
+            activeNotificationPill: root.activeNotificationPill
+            notifAppName: root.notifAppName
+            notifIcon: root.notifIcon
+            notifSummary: root.notifSummary
+            notifBody: root.notifBody
+            activeBatteryPill: root.activeBatteryPill
+            batteryIsCharging: root.batteryIsCharging
+            sysBatteryPct: root.sysBatteryPct
+            showPillLyrics: root.showPillLyrics
+            currentLyricLine: root.currentLyricLine
 
-            // State 2: Battery Pill
-            BatteryPill {
-                anchors.fill: parent
-                visible: opacity > 0
-                opacity: (!root.activeNotificationPill && root.activeBatteryPill) ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-                isCharging: root.batteryIsCharging
-                batteryPercent: root.sysBatteryPct
-            }
+            isPlaying: root.isPlaying
+            currentTimeString: root.currentTimeString
+            trackTitle: root.trackTitle
+            trackArtist: root.trackArtist
 
-            // State 3: Dynamic Lyrics Pill
-            LyricsPillView {
-                anchors.fill: parent
-                visible: opacity > 0
-                opacity: (!root.activeNotificationPill && !root.activeBatteryPill && root.showPillLyrics) ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-                currentLyricLine: root.currentLyricLine
-                accentColor: root.cfgAccentColor
-                fontSize: root.cfgClockFontSize
-            }
-
-            // State 4: Standby View
-            StandbyView {
-                anchors.fill: parent
-                visible: opacity > 0
-                opacity: (!root.activeNotificationPill && !root.activeBatteryPill && !root.showPillLyrics) ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 200 } }
-                isPlaying: root.isPlaying
-                currentTimeString: root.currentTimeString
-                trackTitle: root.trackTitle
-                trackArtist: root.trackArtist
-                accentColor: root.cfgAccentColor
-                fontSize: root.cfgClockFontSize
-                showVisualizer: root.cfgShowVisualizer
-            }
-
-            MouseArea {
-                anchors.fill: parent
-                cursorShape: Qt.PointingHandCursor
-                hoverEnabled: true
-
-                onClicked: {
-                    root.toggleExpanded();
-                }
-
-                onEntered: {
-                    if (root.cfgExpandOnHover) {
-                        root.toggleExpanded();
-                    }
-                }
-            }
+            onRequestToggle: root.openNotch()
         }
     }
 
     // ==============================================================
-    // 2. PANEL EXPANDED DIALOG (Transparent Fixed-Canvas Overlay)
-    // Ukuran window dialog statis (720x420) dengan NoBackground (tanpa frame & shadow)
-    // livingNotch di dalamnya yang melar elastis via Easing.OutBack (60 FPS)
+    // 2. PANEL EXPANDED OVERLAY (Transparent Fixed-Canvas Overlay)
+    // Ukuran window dialog statis (720x480) dengan NoBackground (tanpa frame & shadow)
+    // Berada di bibir paling atas layar (y=0) sehingga siluet utuh yang melar
     // ==============================================================
     PlasmaCore.Dialog {
         id: expandedDialog
-        visualParent: compactPill
-        location: Plasmoid.location
-        flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint
+        width: 720
+        height: 480
+        // Lepaskan ikatan visualParent: atur koordinat absolut terhadap layar (menempel di tengah atas)
+        x: Math.round((Screen.desktopAvailableWidth - width) / 2) + root.cfgHorizontalOffset
+        y: root.cfgVerticalOffset
+        type: PlasmaCore.Dialog.Normal
+        flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.BypassWindowManagerHint | Qt.NoDropShadowWindowHint
         backgroundHints: PlasmaCore.Types.NoBackground
-        hideOnWindowDeactivate: true
-        visible: root.dialogVisible && root.inPanel
+        hideOnWindowDeactivate: false
+        visible: root.dialogSurfaceOpen
 
-        onVisibleChanged: {
-            if (!visible && root.isExpanded && root.inPanel) {
-                root.collapseNotch();
+        onActiveChanged: {
+            if (!active && root.isExpanded) {
+                console.log("[NOTCH] Focus lost terdeteksi, memicu triggerCollapseSequence()");
+                root.triggerCollapseSequence();
             }
         }
 
         mainItem: Item {
             id: fixedCanvas
             implicitWidth: 720
-            implicitHeight: 420
+            implicitHeight: 480
             width: 720
-            height: 420
+            height: 480
+            anchors.top: parent.top
+            y: 0
 
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
             MouseArea {
                 anchors.fill: parent
-                onClicked: root.collapseNotch()
+                onClicked: root.triggerCollapseSequence()
             }
 
             ExpandedNotchCard {
                 id: expandedCardPanel
                 anchors.top: parent.top
+                y: 0
                 anchors.horizontalCenter: parent.horizontalCenter
+                isOverlayDialog: true
                 compactWidth: root.currentCompactWidth
                 compactHeight: root.cfgCompactHeight
-                isExpanded: root.notchExpanding
+                isExpanded: root.isExpanded
 
                 cfgAccentColor: root.cfgAccentColor
                 cfgBgColor: root.cfgBgColor
@@ -674,6 +606,19 @@ PlasmoidItem {
                 showLyrics: root.showLyrics
                 currentTimeString: root.currentTimeString
                 islandShapeMode: root.cfgIslandShapeMode
+
+                // Compact state bindings (identik dengan panelCompactNotch)
+                activeNotificationPill: root.activeNotificationPill
+                notifAppName: root.notifAppName
+                notifIcon: root.notifIcon
+                notifSummary: root.notifSummary
+                notifBody: root.notifBody
+                activeBatteryPill: root.activeBatteryPill
+                batteryIsCharging: root.batteryIsCharging
+                showPillLyrics: root.showPillLyrics
+                currentLyricLine: root.currentLyricLine
+                cfgClockFontSize: root.cfgClockFontSize
+                cfgShowVisualizer: root.cfgShowVisualizer
 
                 sysCpuPct: root.sysCpuPct
                 sysTemp: root.sysTemp
@@ -697,7 +642,7 @@ PlasmoidItem {
                 lyricsFound: root.lyricsFound
 
                 onRequestToggle: root.toggleExpanded()
-                onRequestClose: root.collapseNotch()
+                onRequestClose: root.triggerCollapseSequence()
                 onRequestSwitchTab: (tabIdx) => root.currentExpandedTab = tabIdx
                 onRequestPlayPause: root.playPause()
                 onRequestNext: root.nextTrack()
@@ -710,6 +655,15 @@ PlasmoidItem {
                     }
                 }
                 onRequestRetryLyrics: root.fetchLyrics(true)
+
+                onCollapseCompleted: {
+                    console.log("[NOTCH] T=300ms: Buffer transparan ter-flush, dialog dimatikan dan notch panel dimunculkan.");
+                    root.dialogSurfaceOpen = false;
+                }
+
+                onCollapseFinished: {
+                    root.dialogSurfaceOpen = false;
+                }
             }
         }
     }
