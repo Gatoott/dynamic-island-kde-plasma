@@ -16,6 +16,7 @@ Item {
 
     property color accentColor: "#3daee9"
     property string currentTimeString: ""
+    property string currentDateString: ""
     property string islandMode: "notch" // "notch" or "dock"
 
     // Metrics passed from root / sensors
@@ -310,20 +311,36 @@ Item {
 
                 Item { Layout.fillWidth: true }
 
-                // Center: Digital Clock (Clean centered, no top arrows!)
+                // Center: Digital Clock & Date
                 Item {
                     Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                    implicitWidth: centerClockText.implicitWidth
-                    implicitHeight: centerClockText.implicitHeight
+                    implicitWidth: centerClockCol.implicitWidth
+                    implicitHeight: centerClockCol.implicitHeight
 
-                    Text {
-                        id: centerClockText
+                    Column {
+                        id: centerClockCol
                         anchors.centerIn: parent
-                        text: controlCenterRoot.currentTimeString
-                        font.pixelSize: 13
-                        font.weight: Font.Bold
-                        font.family: "Inter, Roboto, sans-serif"
-                        color: "#ffffff"
+                        spacing: 1
+
+                        Text {
+                            id: centerClockText
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: controlCenterRoot.currentTimeString !== "" ? controlCenterRoot.currentTimeString : "00:00"
+                            font.pixelSize: 13
+                            font.weight: Font.Bold
+                            font.family: "Inter, Roboto, sans-serif"
+                            color: "#ffffff"
+                        }
+
+                        Text {
+                            id: centerDateText
+                            anchors.horizontalCenter: parent.horizontalCenter
+                            text: controlCenterRoot.currentDateString !== "" ? controlCenterRoot.currentDateString : ""
+                            font.pixelSize: 9
+                            font.family: "Inter, Roboto, sans-serif"
+                            color: Qt.rgba(1, 1, 1, 0.65)
+                            visible: text !== ""
+                        }
                     }
                 }
 

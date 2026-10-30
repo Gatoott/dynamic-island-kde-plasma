@@ -49,6 +49,7 @@ PlasmoidItem {
     readonly property int cfgLyricsFontSize: Plasmoid.configuration.lyricsFontSize || 13
     readonly property bool cfgLyricsFontBold: Plasmoid.configuration.lyricsFontBold !== undefined ? Plasmoid.configuration.lyricsFontBold : true
     readonly property bool cfgShowCompactVisualizer: Plasmoid.configuration.showCompactVisualizer !== undefined ? Plasmoid.configuration.showCompactVisualizer : false
+    readonly property bool cfgAutoRetryLyrics: Plasmoid.configuration.autoRetryLyrics !== undefined ? Plasmoid.configuration.autoRetryLyrics : true
 
     readonly property color cfgBgColor: {
         var c = Plasmoid.configuration.backgroundColor;
@@ -120,7 +121,9 @@ PlasmoidItem {
         font.pixelSize: root.cfgLyricsFontSize
         font.bold: root.cfgLyricsFontBold
         font.family: root.cfgLyricsFontFamily !== "" ? root.cfgLyricsFontFamily : "Inter, Roboto, sans-serif"
-        text: root.currentLyricLine !== "" ? root.currentLyricLine : (root.trackTitle !== "" ? root.trackTitle : "...")
+        text: root.currentLyricLine !== "" 
+              ? root.currentLyricLine 
+              : (root.trackTitle ? (root.trackTitle + (root.trackArtist ? " • " + root.trackArtist : "")) : "Tidak ada media")
     }
 
     // --- Clock & Date ---
@@ -186,6 +189,24 @@ PlasmoidItem {
     property bool lyricsLoading: false
     property bool lyricsFound: false
     property string lastFetchedKey: ""
+    property string currentActiveTrackKey: ""
+
+    // Auto-Retry Lyrics Engine
+    property int retryCount: 0
+    property int maxRetries: 4
+
+    Timer {
+        id: retryLyricsTimer
+        interval: 3500
+        repeat: false
+        onTriggered: {
+            if (root.cfgAutoRetryLyrics && root.isPlaying && root.retryCount < root.maxRetries) {
+                root.retryCount++;
+                console.log("[LYRICS] Auto-retrying fetch attempt:", root.retryCount, "of", root.maxRetries);
+                root.fetchLyrics(true);
+            }
+        }
+    }
 
     property real lastSyncPosition: 0
     property double lastSyncTimestamp: 0
@@ -216,6 +237,23 @@ PlasmoidItem {
         lastSyncPosition = 0;
         lastSyncTimestamp = Date.now();
         estimatedTrackPosition = 0;
+        retryCount = 0;
+        retryLyricsTimer.stop();
+        if (trackTitle && trackTitle.length > 0) {
+            fetchLyrics(true);
+        }
+    }
+
+    onTrackArtistChanged: {
+        currentLyricIndex = -1;
+        currentLyricLine = "";
+        lyricsList = [];
+        lyricsFound = false;
+        lastSyncPosition = 0;
+        lastSyncTimestamp = Date.now();
+        estimatedTrackPosition = 0;
+        retryCount = 0;
+        retryLyricsTimer.stop();
         if (trackTitle && trackTitle.length > 0) {
             fetchLyrics(true);
         }
@@ -263,9 +301,86 @@ PlasmoidItem {
     function cleanTrackTitle(title) {
         if (!title) return "";
         return title
-            .replace(/\s*[\(\[\{](official|audio|video|lyric|remaster|deluxe|version|feat|ft\.)[^\)\]\}]*[\)\]\}]/gi, "")
-            .replace(/\s*-\s*(official|audio|video|lyric|remaster|deluxe|version).*$/gi, "")
+            // Hapus teks di dalam kurung/siku: (feat. ...), [Official Video], (Remastered ...), dll.
+            .replace(/\s*[\(\[][^\)\]]*(feat|ft|official|remaster|live|version|edit|audio|deluxe|bonus|explicit)[^\)\]]*[\)\]]/gi, "")
+            // Hapus keterangan setelah strip: "Song Name - Remastered" -> "Song Name"
+            .replace(/\s*-\s*(remastered|live|official video|radio edit|bonus track).*$/i, "")
             .trim();
+    }
+
+    function cleanArtistName(artist) {
+        if (!artist) return "";
+        // Jika ada beberapa artis dipisah koma, titik koma, atau "feat.", ambil artis utama saja
+        return artist
+            .split(/,|;|&|\bfeat\.?\b|\bft\.?\b/i)[0]
+            .trim();
+    }
+
+    function selectBestLyricItem(items, durationSec) {
+        if (!items || items.length === 0) return null;
+
+        // 1. Kumpulkan item yang memiliki syncedLyrics valid
+        var syncedItems = [];
+        for (var i = 0; i < items.length; i++) {
+            if (items[i].syncedLyrics && items[i].syncedLyrics.trim().length > 0) {
+                syncedItems.push(items[i]);
+            }
+        }
+
+        if (syncedItems.length > 0) {
+            if (durationSec > 0) {
+                var bestItem = null;
+                var minDiff = 999999;
+                for (var j = 0; j < syncedItems.length; j++) {
+                    var it = syncedItems[j];
+                    var itDur = (typeof it.duration === "number") ? it.duration : 0;
+                    if (itDur > 0) {
+                        var diff = Math.abs(durationSec - itDur);
+                        if (diff < minDiff) {
+                            minDiff = diff;
+                            bestItem = it;
+                        }
+                    }
+                }
+                // Toleransi maksimal ±5 detik
+                if (bestItem && minDiff <= 5) {
+                    return bestItem;
+                }
+            }
+            // Jika tidak ada yang cocok dalam toleransi durasi, gunakan hasil pertama yang memiliki syncedLyrics
+            return syncedItems[0];
+        }
+
+        // 2. Fallback jika tidak ada syncedLyrics: cari plainLyrics
+        var plainItems = [];
+        for (var k = 0; k < items.length; k++) {
+            if (items[k].plainLyrics && items[k].plainLyrics.trim().length > 0) {
+                plainItems.push(items[k]);
+            }
+        }
+        if (plainItems.length > 0) {
+            if (durationSec > 0) {
+                var bestPlain = null;
+                var minPlainDiff = 999999;
+                for (var m = 0; m < plainItems.length; m++) {
+                    var pIt = plainItems[m];
+                    var pDur = (typeof pIt.duration === "number") ? pIt.duration : 0;
+                    if (pDur > 0) {
+                        var pDiff = Math.abs(durationSec - pDur);
+                        if (pDiff < minPlainDiff) {
+                            minPlainDiff = pDiff;
+                            bestPlain = pIt;
+                        }
+                    }
+                }
+                if (bestPlain && minPlainDiff <= 5) {
+                    return bestPlain;
+                }
+            }
+            return plainItems[0];
+        }
+
+        return null;
     }
 
     function parseLrc(lrcText) {
@@ -306,74 +421,168 @@ PlasmoidItem {
     }
 
     function fetchLyrics(force) {
-        if (!trackTitle || trackTitle.trim() === "") return;
-        var cleanTitle = cleanTrackTitle(trackTitle);
-        var artist = trackArtist ? trackArtist.trim() : "";
-
-        if ((!artist || artist === "Brave" || artist === "Chromium") && cleanTitle.indexOf(" - ") !== -1) {
-            var parts = cleanTitle.split(" - ");
-            artist = parts[0].trim();
-            cleanTitle = cleanTrackTitle(parts[1]);
+        if (!trackTitle || trackTitle.trim() === "") {
+            lyricsList = [];
+            lyricsFound = false;
+            lyricsLoading = false;
+            return;
         }
 
-        var key = cleanTitle + "___" + artist;
-        if (!force && key === lastFetchedKey && lyricsList.length > 0) return;
+        var rawTitle = trackTitle.trim();
+        var rawArtist = trackArtist ? trackArtist.trim() : "";
 
-        lastFetchedKey = key;
+        // Tangani judul dari pemutar web/browser yang berformat "Artis - Judul"
+        if ((!rawArtist || rawArtist === "Brave" || rawArtist === "Chromium" || rawArtist === "Firefox") && rawTitle.indexOf(" - ") !== -1) {
+            var parts = rawTitle.split(" - ");
+            rawArtist = parts[0].trim();
+            rawTitle = parts.slice(1).join(" - ").trim();
+        }
+
+        var cleanTitle = cleanTrackTitle(rawTitle);
+        if (!cleanTitle) cleanTitle = rawTitle;
+        var cleanArtist = cleanArtistName(rawArtist);
+
+        var durationSec = trackLength > 0 ? Math.round(trackLength) : 0;
+        var trackKey = (cleanArtist ? cleanArtist : "Unknown") + " - " + cleanTitle;
+
+        if (!force && trackKey === lastFetchedKey && lyricsList.length > 0) return;
+        if (!force && trackKey === currentActiveTrackKey && lyricsLoading) return;
+
+        currentActiveTrackKey = trackKey;
+        lastFetchedKey = trackKey;
         lyricsLoading = true;
         lyricsFound = false;
 
-        var url = "https://lrclib.net/api/get?track_name=" + encodeURIComponent(cleanTitle) +
-                  "&artist_name=" + encodeURIComponent(artist);
-        if (trackAlbum && trackAlbum.length > 0) url += "&album_name=" + encodeURIComponent(trackAlbum);
-        if (trackLength > 0) url += "&duration=" + Math.round(trackLength);
+        // Tahap 1: Coba Endpoint Exact Match (/api/get)
+        fetchExactLyrics(cleanTitle, cleanArtist, durationSec, trackKey);
+    }
+
+    function fetchExactLyrics(cleanTitle, cleanArtist, durationSec, trackKey) {
+        var url = "https://lrclib.net/api/get?track_name=" + encodeURIComponent(cleanTitle);
+        if (cleanArtist && cleanArtist.length > 0) {
+            url += "&artist_name=" + encodeURIComponent(cleanArtist);
+        }
+        if (trackAlbum && trackAlbum.trim().length > 0) {
+            url += "&album_name=" + encodeURIComponent(trackAlbum.trim());
+        }
+        if (durationSec > 0) {
+            url += "&duration=" + durationSec;
+        }
 
         var xhr = new XMLHttpRequest();
         xhr.open("GET", url);
         xhr.setRequestHeader("User-Agent", "PlasmaDynamicIsland/1.0");
-        xhr.timeout = 7000;
+        xhr.timeout = 6000;
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
+                // Race condition protection: verifikasi lagu masih sama
+                if (root.currentActiveTrackKey !== trackKey) {
+                    console.log("[LYRICS] Request exact match diabaikan karena lagu sudah berganti:", trackKey);
+                    return;
+                }
+
                 if (xhr.status === 200) {
                     try {
                         var data = JSON.parse(xhr.responseText);
-                        if (data.syncedLyrics && data.syncedLyrics.length > 0) {
+                        if (data.syncedLyrics && data.syncedLyrics.trim().length > 0) {
                             var parsed = root.parseLrc(data.syncedLyrics);
                             if (parsed.length > 0) {
                                 root.lyricsList = parsed;
                                 root.lyricsFound = true;
                                 root.lyricsLoading = false;
-                                return;
-                            }
-                        } else if (data.plainLyrics) {
-                            var pLines = data.plainLyrics.split("\n");
-                            var plainParsed = [];
-                            for (var k = 0; k < pLines.length; k++) {
-                                if (pLines[k].trim()) plainParsed.push({ time: k * 3.5, text: pLines[k].trim() });
-                            }
-                            if (plainParsed.length > 0) {
-                                root.lyricsList = plainParsed;
-                                root.lyricsFound = true;
-                                root.lyricsLoading = false;
+                                root.retryCount = 0;
+                                retryLyricsTimer.stop();
                                 return;
                             }
                         }
                     } catch (e) {
-                        console.error("LRCLIB parse error:", e);
+                        console.error("[LYRICS] LRCLIB exact match parse error:", e);
                     }
                 }
-                fallbackSearchLyrics(cleanTitle, artist);
+
+                // Jika exact match 404 atau tidak ada syncedLyrics, lanjut ke Tahap 2: Search dengan filter durasi
+                fallbackSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey);
             }
         };
         xhr.ontimeout = function() {
-            fallbackSearchLyrics(cleanTitle, artist);
+            if (root.currentActiveTrackKey !== trackKey) return;
+            fallbackSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey);
         };
         xhr.send();
     }
 
-    function fallbackSearchLyrics(cleanTitle, artist) {
+    function fallbackSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey) {
+        var searchUrl = "https://lrclib.net/api/search?track_name=" + encodeURIComponent(cleanTitle);
+        if (cleanArtist && cleanArtist.length > 0) {
+            searchUrl += "&artist_name=" + encodeURIComponent(cleanArtist);
+        }
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("GET", searchUrl);
+        xhr.setRequestHeader("User-Agent", "PlasmaDynamicIsland/1.0");
+        xhr.timeout = 7000;
+        xhr.onreadystatechange = function() {
+            if (xhr.readyState === XMLHttpRequest.DONE) {
+                // Race condition protection
+                if (root.currentActiveTrackKey !== trackKey) {
+                    console.log("[LYRICS] Fallback search diabaikan karena lagu sudah berganti:", trackKey);
+                    return;
+                }
+
+                if (xhr.status === 200) {
+                    try {
+                        var items = JSON.parse(xhr.responseText);
+                        if (Array.isArray(items) && items.length > 0) {
+                            var best = root.selectBestLyricItem(items, durationSec);
+                            if (best) {
+                                if (best.syncedLyrics && best.syncedLyrics.trim().length > 0) {
+                                    var parsed = root.parseLrc(best.syncedLyrics);
+                                    if (parsed.length > 0) {
+                                        root.lyricsList = parsed;
+                                        root.lyricsFound = true;
+                                        root.lyricsLoading = false;
+                                        root.retryCount = 0;
+                                        retryLyricsTimer.stop();
+                                        return;
+                                    }
+                                } else if (best.plainLyrics && best.plainLyrics.trim().length > 0) {
+                                    var pLines = best.plainLyrics.split("\n");
+                                    var plainParsed = [];
+                                    for (var k = 0; k < pLines.length; k++) {
+                                        if (pLines[k].trim()) plainParsed.push({ time: k * 3.5, text: pLines[k].trim() });
+                                    }
+                                    if (plainParsed.length > 0) {
+                                        root.lyricsList = plainParsed;
+                                        root.lyricsFound = true;
+                                        root.lyricsLoading = false;
+                                        root.retryCount = 0;
+                                        retryLyricsTimer.stop();
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error("[LYRICS] Search parse error:", e);
+                    }
+                }
+
+                // Jika search spesifik track_name+artist_name tidak membuahkan hasil, coba query umum q=
+                generalSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey);
+            }
+        };
+        xhr.ontimeout = function() {
+            if (root.currentActiveTrackKey !== trackKey) return;
+            generalSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey);
+        };
+        xhr.send();
+    }
+
+    function generalSearchLyrics(cleanTitle, cleanArtist, durationSec, trackKey) {
         var query = cleanTitle;
-        if (artist && artist !== "Brave" && artist !== "Chromium") query += " " + artist;
+        if (cleanArtist && cleanArtist.length > 0) {
+            query += " " + cleanArtist;
+        }
         var searchUrl = "https://lrclib.net/api/search?q=" + encodeURIComponent(query);
 
         var xhr = new XMLHttpRequest();
@@ -382,37 +591,61 @@ PlasmoidItem {
         xhr.timeout = 7000;
         xhr.onreadystatechange = function() {
             if (xhr.readyState === XMLHttpRequest.DONE) {
+                if (root.currentActiveTrackKey !== trackKey) {
+                    console.log("[LYRICS] General search diabaikan karena lagu sudah berganti:", trackKey);
+                    return;
+                }
+
                 root.lyricsLoading = false;
                 if (xhr.status === 200) {
                     try {
                         var items = JSON.parse(xhr.responseText);
                         if (Array.isArray(items) && items.length > 0) {
-                            for (var i = 0; i < items.length; i++) {
-                                if (items[i].syncedLyrics && items[i].syncedLyrics.length > 0) {
-                                    var parsed = root.parseLrc(items[i].syncedLyrics);
+                            var best = root.selectBestLyricItem(items, durationSec);
+                            if (best) {
+                                if (best.syncedLyrics && best.syncedLyrics.trim().length > 0) {
+                                    var parsed = root.parseLrc(best.syncedLyrics);
                                     if (parsed.length > 0) {
                                         root.lyricsList = parsed;
                                         root.lyricsFound = true;
+                                        root.retryCount = 0;
+                                        retryLyricsTimer.stop();
+                                        return;
+                                    }
+                                } else if (best.plainLyrics && best.plainLyrics.trim().length > 0) {
+                                    var pLines = best.plainLyrics.split("\n");
+                                    var plainParsed = [];
+                                    for (var k = 0; k < pLines.length; k++) {
+                                        if (pLines[k].trim()) plainParsed.push({ time: k * 3.5, text: pLines[k].trim() });
+                                    }
+                                    if (plainParsed.length > 0) {
+                                        root.lyricsList = plainParsed;
+                                        root.lyricsFound = true;
+                                        root.retryCount = 0;
+                                        retryLyricsTimer.stop();
                                         return;
                                     }
                                 }
                             }
-                            if (items[0].plainLyrics) {
-                                var pLines = items[0].plainLyrics.split("\n");
-                                var plainParsed = [];
-                                for (var k = 0; k < pLines.length; k++) {
-                                    if (pLines[k].trim()) plainParsed.push({ time: k * 3.5, text: pLines[k].trim() });
-                                }
-                                root.lyricsList = plainParsed;
-                                root.lyricsFound = true;
-                                return;
-                            }
                         }
                     } catch (e) {
-                        console.error("Fallback search parse error:", e);
+                        console.error("[LYRICS] General search parse error:", e);
                     }
                 }
                 root.lyricsFound = false;
+                if (root.cfgAutoRetryLyrics && root.isPlaying && root.retryCount < root.maxRetries) {
+                    console.log("[LYRICS] Lirik belum ditemukan, auto-retry dijadwalkan dalam 3.5s (attempt " + (root.retryCount + 1) + "/" + root.maxRetries + ")");
+                    retryLyricsTimer.restart();
+                }
+            }
+        };
+        xhr.ontimeout = function() {
+            if (root.currentActiveTrackKey !== trackKey) return;
+            root.lyricsLoading = false;
+            root.lyricsFound = false;
+            if (root.cfgAutoRetryLyrics && root.isPlaying && root.retryCount < root.maxRetries) {
+                console.log("[LYRICS] Request timeout, auto-retry dijadwalkan dalam 3.5s (attempt " + (root.retryCount + 1) + "/" + root.maxRetries + ")");
+                retryLyricsTimer.restart();
             }
         };
         xhr.send();
@@ -795,7 +1028,11 @@ PlasmoidItem {
                     }
                 }
                 onRequestCloseLyrics: root.showLyrics = false
-                onRequestRetryLyrics: root.fetchLyrics(true)
+                onRequestRetryLyrics: {
+                    root.retryCount = 0;
+                    retryLyricsTimer.stop();
+                    root.fetchLyrics(true);
+                }
                 onRequestDemoLyrics: {
                     root.lyricsList = [
                         { time: 0, text: "Paper Sky - Lumen Coast" },
@@ -917,7 +1154,11 @@ PlasmoidItem {
             }
         }
         onRequestCloseLyrics: root.showLyrics = false
-        onRequestRetryLyrics: root.fetchLyrics(true)
+        onRequestRetryLyrics: {
+            root.retryCount = 0;
+            retryLyricsTimer.stop();
+            root.fetchLyrics(true);
+        }
         onRequestDemoLyrics: {
             root.lyricsList = [
                 { time: 0, text: "Paper Sky - Lumen Coast" },

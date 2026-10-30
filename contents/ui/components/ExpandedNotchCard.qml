@@ -446,6 +446,8 @@ Item {
                 opacity: (!unifiedNotchRoot.activeNotificationPill && !unifiedNotchRoot.activeBatteryPill && unifiedNotchRoot.showPillLyrics) ? 1 : 0
                 Behavior on opacity { NumberAnimation { duration: 160 } }
                 currentLyricLine: unifiedNotchRoot.currentLyricLine
+                trackTitle: unifiedNotchRoot.trackTitle
+                trackArtist: unifiedNotchRoot.trackArtist
                 accentColor: unifiedNotchRoot.cfgAccentColor
                 fontSize: unifiedNotchRoot.cfgLyricsFontSize
                 lyricsFontFamily: unifiedNotchRoot.cfgLyricsFontFamily
@@ -543,6 +545,7 @@ Item {
                         anchors.fill: parent
                         accentColor: unifiedNotchRoot.cfgAccentColor
                         currentTimeString: unifiedNotchRoot.currentTimeString
+                        currentDateString: unifiedNotchRoot.currentDateString
                         islandMode: unifiedNotchRoot.islandShapeMode
                         cpuPercent: unifiedNotchRoot.sysCpuPct
                         cpuTemp: unifiedNotchRoot.sysTemp

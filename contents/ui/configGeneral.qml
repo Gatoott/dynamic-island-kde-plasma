@@ -47,10 +47,11 @@ KCM.SimpleKCM {
     property alias cfg_clockFontSize: clockFontSizeSpin.value
     property alias cfg_clockFontBold: clockFontBoldSwitch.checked
 
-    // Lyrics Typography in Notch
+    // Lyrics Typography & Settings
     property alias cfg_lyricsFontFamily: lyricsFontCombo.currentText
     property alias cfg_lyricsFontSize: lyricsFontSizeSpin.value
     property alias cfg_lyricsFontBold: lyricsFontBoldSwitch.checked
+    property alias cfg_autoRetryLyrics: autoRetryLyricsCheck.checked
 
     readonly property var systemFonts: ["Default (Inter/Roboto)"].concat(Qt.fontFamilies())
 
@@ -199,6 +200,13 @@ KCM.SimpleKCM {
             id: lyricsFontBoldSwitch
             Kirigami.FormData.label: i18n("Bobot Font Lirik:")
             text: i18n("Tebal (Bold / DemiBold)")
+            checked: true
+        }
+
+        QQC2.CheckBox {
+            id: autoRetryLyricsCheck
+            Kirigami.FormData.label: i18n("Auto-Retry Lirik:")
+            text: i18n("Otomatis coba lagi jika lirik gagal ditemukan (Auto-retry lyrics)")
             checked: true
         }
 

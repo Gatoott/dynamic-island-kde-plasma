@@ -240,6 +240,8 @@ Item {
             opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && compactNotchRoot.showPillLyrics) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             currentLyricLine: compactNotchRoot.currentLyricLine
+            trackTitle: compactNotchRoot.trackTitle
+            trackArtist: compactNotchRoot.trackArtist
             accentColor: compactNotchRoot.cfgAccentColor
             fontSize: compactNotchRoot.cfgLyricsFontSize
             lyricsFontFamily: compactNotchRoot.cfgLyricsFontFamily

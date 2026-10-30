@@ -7,6 +7,8 @@ Item {
     id: lyricsPillRoot
 
     property string currentLyricLine: ""
+    property string trackTitle: ""
+    property string trackArtist: ""
     property color accentColor: "#3daee9"
     property int fontSize: 13
     property string lyricsFontFamily: ""
@@ -44,7 +46,9 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                text: lyricsPillRoot.currentLyricLine !== "" ? lyricsPillRoot.currentLyricLine : "..."
+                text: lyricsPillRoot.currentLyricLine !== "" 
+                      ? lyricsPillRoot.currentLyricLine 
+                      : (lyricsPillRoot.trackTitle ? (lyricsPillRoot.trackTitle + (lyricsPillRoot.trackArtist ? " • " + lyricsPillRoot.trackArtist : "")) : "Tidak ada media")
                 font.pixelSize: lyricsPillRoot.fontSize
                 font.bold: lyricsPillRoot.lyricsFontBold
                 font.family: lyricsPillRoot.lyricsFontFamily ? lyricsPillRoot.lyricsFontFamily : "Inter, Roboto, sans-serif"

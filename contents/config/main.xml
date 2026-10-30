@@ -101,5 +101,8 @@
     <entry name="lyricsFontBold" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="autoRetryLyrics" type="Bool">
+      <default>true</default>
+    </entry>
   </group>
 </kcfg>

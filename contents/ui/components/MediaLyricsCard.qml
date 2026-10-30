@@ -193,34 +193,51 @@ Item {
     Item {
         id: headerClockContainer
         anchors.top: parent.top
-        anchors.topMargin: 10
+        anchors.topMargin: 6
         anchors.horizontalCenter: parent.horizontalCenter
-        height: 24
+        height: headerClockColumn.implicitHeight
         z: 5
 
-        Row {
+        Column {
+            id: headerClockColumn
             anchors.centerIn: parent
-            spacing: 8
+            spacing: 1
 
-            // Status dot hijau saat playing
-            Rectangle {
-                width: 6
-                height: 6
-                radius: 3
-                color: "#22c55e"
-                anchors.verticalCenter: parent.verticalCenter
-                visible: mediaCardRoot.isPlaying
+            Row {
+                anchors.horizontalCenter: parent.horizontalCenter
+                spacing: 6
+
+                // Status dot hijau saat playing
+                Rectangle {
+                    width: 6
+                    height: 6
+                    radius: 3
+                    color: "#22c55e"
+                    anchors.verticalCenter: parent.verticalCenter
+                    visible: mediaCardRoot.isPlaying
+                }
+
+                // Teks Jam Utama: Ukuran lebih besar & bold ala Notch
+                Text {
+                    id: headerClockText
+                    text: mediaCardRoot.currentTimeString !== "" ? mediaCardRoot.currentTimeString : "00:00"
+                    color: "#ffffff"
+                    font.pixelSize: 16
+                    font.bold: true
+                    font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
             }
 
-            // Teks Jam Utama: Ukuran lebih besar & bold ala Notch
+            // Teks Tanggal di bawah jam
             Text {
-                id: headerClockText
-                text: mediaCardRoot.currentTimeString !== "" ? mediaCardRoot.currentTimeString : "00:00"
-                color: "#ffffff"
-                font.pixelSize: 18 // Lebih besar & jelas
-                font.bold: true
+                id: headerDateText
+                text: mediaCardRoot.currentDateString !== "" ? mediaCardRoot.currentDateString : ""
+                color: Qt.rgba(1, 1, 1, 0.65)
+                font.pixelSize: 10
                 font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
-                anchors.verticalCenter: parent.verticalCenter
+                anchors.horizontalCenter: parent.horizontalCenter
+                visible: text !== ""
             }
         }
     }
@@ -247,7 +264,7 @@ Item {
     Item {
         id: standardMediaView
         anchors.top: headerClockContainer.bottom
-        anchors.topMargin: 6
+        anchors.topMargin: 4
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
         anchors.left: parent.left
@@ -605,7 +622,7 @@ Item {
     Item {
         id: lyricsSplitView
         anchors.top: headerClockContainer.bottom
-        anchors.topMargin: 6
+        anchors.topMargin: 4
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
         anchors.left: parent.left
