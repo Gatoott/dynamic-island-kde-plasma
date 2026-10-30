@@ -69,19 +69,36 @@
     <entry name="showVisualizer" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="enableMediaTab" type="Bool">
+    <entry name="showCompactVisualizer" type="Bool">
+      <default>false</default>
+    </entry>
+    <entry name="showControlTab" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="enableSysMonitorTab" type="Bool">
+    <entry name="showMediaTab" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="enableNotificationTab" type="Bool">
+    <entry name="showClipboardTab" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="enableClipboardTab" type="Bool">
+    <entry name="showNotificationTab" type="Bool">
       <default>true</default>
     </entry>
-    <entry name="enableLauncherTab" type="Bool">
+
+    <!-- Typography Customization -->
+    <entry name="clockFontFamily" type="String">
+      <default></default>
+    </entry>
+    <entry name="clockFontBold" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="lyricsFontFamily" type="String">
+      <default></default>
+    </entry>
+    <entry name="lyricsFontSize" type="Int">
+      <default>13</default>
+    </entry>
+    <entry name="lyricsFontBold" type="Bool">
       <default>true</default>
     </entry>
   </group>

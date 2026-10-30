@@ -12,6 +12,7 @@ Item {
     property string appIcon: "preferences-desktop-notification"
     property string summary: ""
     property string body: ""
+    property color accentColor: "#3daee9"
 
     implicitHeight: 36
 
@@ -37,41 +38,22 @@ Item {
             }
         }
 
-        // Title / Sender + Message Preview
-        ColumnLayout {
+        // Notification Title / Summary (Ringkas - Title Only)
+        Item {
             Layout.fillWidth: true
-            spacing: 1
+            Layout.fillHeight: true
 
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: 6
-
-                Text {
-                    text: root.summary.length > 0 ? root.summary : (root.appName.length > 0 ? root.appName : i18n("Notification"))
-                    font.pixelSize: 11
-                    font.bold: true
-                    color: "#ffffff"
-                    font.family: "Inter, Roboto, sans-serif"
-                    elide: Text.ElideRight
-                    Layout.maximumWidth: 160
-                }
-
-                Text {
-                    text: "•"
-                    font.pixelSize: 10
-                    color: Qt.rgba(1, 1, 1, 0.4)
-                    visible: root.body.length > 0
-                }
-
-                Text {
-                    Layout.fillWidth: true
-                    text: root.body
-                    font.pixelSize: 11
-                    color: Qt.rgba(1, 1, 1, 0.75)
-                    font.family: "Inter, Roboto, sans-serif"
-                    elide: Text.ElideRight
-                    visible: root.body.length > 0
-                }
+            Text {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                text: root.summary.length > 0 ? root.summary : (root.appName.length > 0 ? root.appName : i18n("Notification"))
+                font.pixelSize: 12
+                font.weight: Font.Bold
+                font.family: "Inter, Roboto, sans-serif"
+                color: "#ffffff"
+                elide: Text.ElideRight
+                verticalAlignment: Text.AlignVCenter
             }
         }
 
@@ -80,7 +62,7 @@ Item {
             Layout.preferredWidth: 6
             Layout.preferredHeight: 6
             radius: 3
-            color: "#3daee9"
+            color: root.accentColor
         }
     }
 }

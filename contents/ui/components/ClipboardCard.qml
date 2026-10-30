@@ -28,7 +28,7 @@ Item {
 
     Timer {
         id: autoRefreshTimer
-        interval: 3000
+        interval: 1500
         running: root.visible
         repeat: true
         onTriggered: root.refreshHistory()
@@ -51,10 +51,19 @@ Item {
         root.loading = true;
         klipperCall.call("getClipboardHistoryMenu", [], (reply) => {
             root.loading = false;
-            if (typeof reply !== "undefined" && reply !== null && reply.arguments && reply.arguments.length > 0) {
-                var list = reply.arguments[0];
+            if (reply && !reply.isError) {
+                var list = null;
+                if (reply.value !== undefined && Array.isArray(reply.value)) {
+                    list = reply.value;
+                } else if (reply.values && reply.values.length > 0 && Array.isArray(reply.values[0])) {
+                    list = reply.values[0];
+                } else if (reply.arguments && reply.arguments.length > 0 && Array.isArray(reply.arguments[0])) {
+                    list = reply.arguments[0];
+                }
+
                 if (Array.isArray(list)) {
-                    root.clipboardItems = list;
+                    // Ambil maksimal 15 item riwayat teks terakhir
+                    root.clipboardItems = list.slice(0, 15);
                 } else {
                     root.clipboardItems = [];
                 }
@@ -281,7 +290,7 @@ Item {
                                 anchors.centerIn: parent
                                 width: 12
                                 height: 12
-                                source: "checkmark"
+                                source: "dialog-ok"
                                 color: "#2ecc71"
                             }
                         }

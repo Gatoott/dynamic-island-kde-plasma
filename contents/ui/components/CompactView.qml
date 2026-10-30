@@ -18,7 +18,13 @@ Item {
     property color cfgBorderColor: "#2a2b36"
     property color cfgAccentColor: "#3daee9"
     property int cfgClockFontSize: 13
+    property string cfgClockFontFamily: ""
+    property bool cfgClockFontBold: true
+    property string cfgLyricsFontFamily: ""
+    property int cfgLyricsFontSize: 13
+    property bool cfgLyricsFontBold: true
     property bool cfgShowVisualizer: true
+    property bool cfgShowCompactVisualizer: false
 
     // State bindings
     property bool isPlaying: false
@@ -235,7 +241,11 @@ Item {
             Behavior on opacity { NumberAnimation { duration: 160 } }
             currentLyricLine: compactNotchRoot.currentLyricLine
             accentColor: compactNotchRoot.cfgAccentColor
-            fontSize: compactNotchRoot.cfgClockFontSize
+            fontSize: compactNotchRoot.cfgLyricsFontSize
+            lyricsFontFamily: compactNotchRoot.cfgLyricsFontFamily
+            lyricsFontBold: compactNotchRoot.cfgLyricsFontBold
+            showCompactVisualizer: compactNotchRoot.cfgShowCompactVisualizer
+            isPlaying: compactNotchRoot.isPlaying
         }
 
         // State 4: Standby View (Jam & Audio Visualizer)
@@ -250,6 +260,8 @@ Item {
             trackArtist: compactNotchRoot.trackArtist
             accentColor: compactNotchRoot.cfgAccentColor
             fontSize: compactNotchRoot.cfgClockFontSize
+            clockFontFamily: compactNotchRoot.cfgClockFontFamily
+            clockFontBold: compactNotchRoot.cfgClockFontBold
             showVisualizer: compactNotchRoot.cfgShowVisualizer
         }
 

@@ -28,6 +28,9 @@ QtObject {
         if (callback && reply) {
             reply.finished.connect(() => {
                 try {
+                    if (reply.value !== undefined && !reply.arguments) {
+                        reply.arguments = Array.isArray(reply.value) ? [reply.value] : [reply.value];
+                    }
                     callback(reply);
                 } catch (e) {
                     console.error("DBusCall callback error:", e);

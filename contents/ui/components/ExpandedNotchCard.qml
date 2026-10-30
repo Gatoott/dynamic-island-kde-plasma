@@ -17,6 +17,30 @@ Item {
     property string currentTimeString: "00:00"
     property string islandShapeMode: "notch"
 
+    // Tab Modular Visibility
+    property bool showControlTab: true
+    property bool showMediaTab: true
+    property bool showClipboardTab: true
+    property bool showNotificationTab: true
+
+    readonly property var availableTabs: {
+        var tabs = [];
+        if (showControlTab) tabs.push("control");
+        if (showMediaTab) tabs.push("media");
+        if (showClipboardTab) tabs.push("clipboard");
+        if (showNotificationTab) tabs.push("notification");
+        if (tabs.length === 0) tabs.push("control");
+        return tabs;
+    }
+    readonly property string activeTabKey: (availableTabs && availableTabs.length > 0) ? availableTabs[currentExpandedTab % availableTabs.length] : "control"
+
+    // Typography Options
+    property string cfgClockFontFamily: ""
+    property bool cfgClockFontBold: true
+    property string cfgLyricsFontFamily: ""
+    property int cfgLyricsFontSize: 13
+    property bool cfgLyricsFontBold: true
+
     // Visual styles passed from parent
     property color cfgAccentColor: "#3daee9"
     property color cfgBgColor: Qt.rgba(0.05, 0.06, 0.07, 0.95)
@@ -38,6 +62,8 @@ Item {
     property string currentLyricLine: ""
     property int cfgClockFontSize: 13
     property bool cfgShowVisualizer: true
+    property bool cfgShowCompactVisualizer: false
+    property string currentDateString: ""
 
     // System Metrics
     property int sysCpuPct: 12
@@ -62,6 +88,9 @@ Item {
     property bool lyricsLoading: false
     property bool lyricsFound: false
 
+    // Notification History
+    property var notificationHistory: []
+
     // Signals
     signal requestToggle()
     signal requestClose()
@@ -71,7 +100,11 @@ Item {
     signal requestPrevious()
     signal requestSeek(real positionSeconds)
     signal requestToggleLyrics()
+    signal requestCloseLyrics()
     signal requestRetryLyrics()
+    signal requestDemoLyrics()
+    signal requestClearAllNotifications()
+    signal requestRemoveNotification(var notifId)
     signal collapseCompleted()
     signal collapseFinished()
 
@@ -85,8 +118,49 @@ Item {
     property real cornerRadius: isExpanded ? 22 : 18
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
-    property real targetW: compactWidth
-    property real targetH: compactHeight
+    // Pemetaan Dimensi Eksplisit Tiap Tab (Anti-NaN & Anti-Squish)
+    // Tab 0: Control Center (Landscape Dashboard) -> 520 x 380
+    // Tab 1: Media Player (Landscape Card)        -> 540 x 210
+    // Tab 2: Synced Lyrics (Landscape Split)      -> 620 x 220
+    // Tab 3: Clipboard Manager                    -> 480 x 360
+    // Tab 4: Notification History                 -> 480 x 360
+    function getTargetWidthForTab(tabIndex, lyricsActive) {
+        var key = activeTabKey;
+        if (key === "media" || tabIndex === 1) {
+            return lyricsActive ? 620 : 540;
+        }
+        if (key === "control" || tabIndex === 0) {
+            return 520;
+        }
+        if (key === "clipboard" || tabIndex === 2) {
+            return 480;
+        }
+        if (key === "notification" || tabIndex === 3) {
+            return 480;
+        }
+        return 520;
+    }
+
+    function getTargetHeightForTab(tabIndex, lyricsActive) {
+        var key = activeTabKey;
+        if (key === "media" || tabIndex === 1) {
+            return lyricsActive ? 220 : 210;
+        }
+        if (key === "control" || tabIndex === 0) {
+            return 380;
+        }
+        if (key === "clipboard" || tabIndex === 2) {
+            return 360;
+        }
+        if (key === "notification" || tabIndex === 3) {
+            return 360;
+        }
+        return 360;
+    }
+
+    // Ikat targetW dan targetH secara langsung dan reaktif:
+    property real targetW: isExpanded ? getTargetWidthForTab(currentExpandedTab, showLyrics) : compactWidth
+    property real targetH: isExpanded ? getTargetHeightForTab(currentExpandedTab, showLyrics) : compactHeight
 
     width: targetW + (wingRadius * 2)
     height: targetH
@@ -110,22 +184,16 @@ Item {
     }
 
     onIsExpandedChanged: {
-        if (!isExpanded) {
-            targetH = compactHeight;
-            targetW = compactWidth;
-        } else {
+        if (isExpanded) {
             unifiedNotchRoot.bodyOpacity = 1.0;
-            targetH = cfgExpandedHeight;
-            targetW = (currentExpandedTab === 1 && showLyrics) ? 680 : cfgExpandedWidth;
+        } else {
+            // Jika selisih tinggi sudah sangat kecil, langsung selesaikan tanpa menunggu animasi
+            if (Math.abs(unifiedNotchRoot.height - compactHeight) < 2) {
+                unifiedNotchRoot.collapseCompleted();
+                unifiedNotchRoot.collapseFinished();
+            }
         }
     }
-
-    onCompactWidthChanged: { if (!isExpanded) targetW = compactWidth; }
-    onCompactHeightChanged: { if (!isExpanded) targetH = compactHeight; }
-    onCfgExpandedWidthChanged: { if (isExpanded && (currentExpandedTab !== 1 || !showLyrics)) targetW = cfgExpandedWidth; }
-    onCfgExpandedHeightChanged: { if (isExpanded) targetH = cfgExpandedHeight; }
-    onCurrentExpandedTabChanged: { if (isExpanded) targetW = (currentExpandedTab === 1 && showLyrics) ? 680 : cfgExpandedWidth; }
-    onShowLyricsChanged: { if (isExpanded) targetW = (currentExpandedTab === 1 && showLyrics) ? 680 : cfgExpandedWidth; }
 
     Timer {
         id: bufferFlushTimer
@@ -379,10 +447,14 @@ Item {
                 Behavior on opacity { NumberAnimation { duration: 160 } }
                 currentLyricLine: unifiedNotchRoot.currentLyricLine
                 accentColor: unifiedNotchRoot.cfgAccentColor
-                fontSize: unifiedNotchRoot.cfgClockFontSize
+                fontSize: unifiedNotchRoot.cfgLyricsFontSize
+                lyricsFontFamily: unifiedNotchRoot.cfgLyricsFontFamily
+                lyricsFontBold: unifiedNotchRoot.cfgLyricsFontBold
+                showCompactVisualizer: unifiedNotchRoot.cfgShowCompactVisualizer
+                isPlaying: unifiedNotchRoot.isPlaying
             }
 
-            // State 4: Standby View (♫, Clock, Visualizer)
+            // State 4: Standby View (Music Icon, Clock, Visualizer)
             StandbyView {
                 anchors.fill: parent
                 visible: opacity > 0
@@ -394,6 +466,8 @@ Item {
                 trackArtist: unifiedNotchRoot.trackArtist
                 accentColor: unifiedNotchRoot.cfgAccentColor
                 fontSize: unifiedNotchRoot.cfgClockFontSize
+                clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
+                clockFontBold: unifiedNotchRoot.cfgClockFontBold
                 showVisualizer: unifiedNotchRoot.cfgShowVisualizer
             }
 
@@ -423,6 +497,7 @@ Item {
                 anchors.left: parent.left
                 anchors.right: parent.right
                 height: 18
+                z: 10
 
                 MouseArea {
                     anchors.fill: parent
@@ -440,33 +515,28 @@ Item {
                 }
             }
 
-            // Cards Area
+            // Cards Body Area - Fills notch body completely
             Item {
-                id: cardsArea
-                anchors.top: topNotchHandle.bottom
-                anchors.topMargin: 2
-                anchors.bottom: paginationDotsRow.top
-                anchors.bottomMargin: 4
-                anchors.left: parent.left
-                anchors.right: parent.right
-                anchors.leftMargin: 36
-                anchors.rightMargin: 36
+                id: cardBodyContainer
+                anchors.fill: parent
+                clip: true
 
                 Loader {
                     id: tabLoader
                     anchors.fill: parent
                     sourceComponent: {
                         if (!unifiedNotchRoot.isExpanded) return null;
-                        switch (unifiedNotchRoot.currentExpandedTab) {
-                            case 0: return controlCenterComponent;
-                            case 1: return mediaLyricsComponent;
-                            case 2: return clipboardComponent;
+                        switch (unifiedNotchRoot.activeTabKey) {
+                            case "control": return controlCenterComponent;
+                            case "media": return mediaLyricsComponent;
+                            case "clipboard": return clipboardComponent;
+                            case "notification": return notificationHistoryComponent;
                             default: return controlCenterComponent;
                         }
                     }
                 }
 
-                // Tab 0: Control Center Utama
+                // Tab: Control Center Utama
                 Component {
                     id: controlCenterComponent
                     ControlCenterCard {
@@ -481,11 +551,16 @@ Item {
                         batteryCharging: unifiedNotchRoot.sysBatteryCharging
                         batteryTemp: 32
 
-                        onRequestSwitchToMedia: unifiedNotchRoot.requestSwitchTab(1)
+                        onRequestSwitchToMedia: {
+                            var mediaIdx = unifiedNotchRoot.availableTabs.indexOf("media");
+                            if (mediaIdx !== -1) {
+                                unifiedNotchRoot.requestSwitchTab(mediaIdx);
+                            }
+                        }
                     }
                 }
 
-                // Tab 1: Media Player & Dynamic Lyrics
+                // Tab: Media Player & Dynamic Lyrics
                 Component {
                     id: mediaLyricsComponent
                     MediaLyricsCard {
@@ -507,23 +582,81 @@ Item {
                         lyricsLoading: unifiedNotchRoot.lyricsLoading
                         lyricsFound: unifiedNotchRoot.lyricsFound
                         activeTabIndex: unifiedNotchRoot.currentExpandedTab
+                        lyricsFontFamily: unifiedNotchRoot.cfgLyricsFontFamily
+                        lyricsFontSize: unifiedNotchRoot.cfgLyricsFontSize
+                        lyricsFontBold: unifiedNotchRoot.cfgLyricsFontBold
+                        currentTimeString: unifiedNotchRoot.currentTimeString
+                        currentDateString: unifiedNotchRoot.currentDateString
 
                         onRequestPlayPause: unifiedNotchRoot.requestPlayPause()
                         onRequestNext: unifiedNotchRoot.requestNext()
                         onRequestPrevious: unifiedNotchRoot.requestPrevious()
                         onRequestSeek: (pos) => unifiedNotchRoot.requestSeek(pos)
                         onRequestToggleLyrics: unifiedNotchRoot.requestToggleLyrics()
+                        onRequestCloseLyrics: unifiedNotchRoot.requestCloseLyrics()
                         onRequestRetryLyrics: unifiedNotchRoot.requestRetryLyrics()
+                        onRequestDemoLyrics: unifiedNotchRoot.requestDemoLyrics()
                         onRequestSwitchTab: (tabIdx) => unifiedNotchRoot.requestSwitchTab(tabIdx)
                     }
                 }
 
-                // Tab 2: Clipboard Manager (Klipper Integration)
+                // Tab: Clipboard Manager (Klipper Integration)
                 Component {
                     id: clipboardComponent
                     ClipboardCard {
                         anchors.fill: parent
                         accentColor: unifiedNotchRoot.cfgAccentColor
+                    }
+                }
+
+                // Tab: Notification History
+                Component {
+                    id: notificationHistoryComponent
+                    NotificationHistoryCard {
+                        anchors.fill: parent
+                        accentColor: unifiedNotchRoot.cfgAccentColor
+                        notificationItems: unifiedNotchRoot.notificationHistory
+                        onRequestClearAll: unifiedNotchRoot.requestClearAllNotifications()
+                        onRequestRemoveItem: (id) => unifiedNotchRoot.requestRemoveNotification(id)
+                    }
+                }
+            }
+
+            // Bottom Navigation Bar with Dots
+            Item {
+                id: navDotsBar
+                anchors.bottom: parent.bottom
+                anchors.bottomMargin: 4
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: parent.width
+                height: 24
+                z: 10
+
+                // Pagination Dots
+                Row {
+                    id: paginationDotsRow
+                    anchors.centerIn: parent
+                    visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
+                    spacing: 7
+
+                    Repeater {
+                        model: unifiedNotchRoot.availableTabs.length
+                        Rectangle {
+                            required property int index
+                            readonly property bool isCurrent: (unifiedNotchRoot.currentExpandedTab % unifiedNotchRoot.availableTabs.length) === index
+                            width: isCurrent ? 16 : 6
+                            height: 6
+                            radius: 3
+                            color: isCurrent ? unifiedNotchRoot.cfgAccentColor : Qt.rgba(1, 1, 1, 0.25)
+                            Behavior on width { NumberAnimation { duration: 200 } }
+                            Behavior on color { ColorAnimation { duration: 200 } }
+
+                            MouseArea {
+                                anchors.fill: parent
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: unifiedNotchRoot.requestSwitchTab(parent.index)
+                            }
+                        }
                     }
                 }
             }
@@ -537,16 +670,17 @@ Item {
                 anchors.left: parent.left
                 anchors.leftMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing
+                z: 10
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
                 color: leftNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "‹"
-                    font.pixelSize: 18
-                    font.bold: true
+                    width: 14
+                    height: 14
+                    source: "go-previous"
                     color: "#ffffff"
                 }
 
@@ -556,7 +690,10 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        unifiedNotchRoot.requestSwitchTab((unifiedNotchRoot.currentExpandedTab - 1 + 3) % 3);
+                        var count = unifiedNotchRoot.availableTabs.length;
+                        if (count > 0) {
+                            unifiedNotchRoot.requestSwitchTab((unifiedNotchRoot.currentExpandedTab - 1 + count) % count);
+                        }
                     }
                 }
             }
@@ -570,16 +707,17 @@ Item {
                 anchors.right: parent.right
                 anchors.rightMargin: 6
                 anchors.verticalCenter: parent.verticalCenter
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing
+                z: 10
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
                 color: rightNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "›"
-                    font.pixelSize: 18
-                    font.bold: true
+                    width: 14
+                    height: 14
+                    source: "go-next"
                     color: "#ffffff"
                 }
 
@@ -589,35 +727,9 @@ Item {
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
                     onClicked: {
-                        unifiedNotchRoot.requestSwitchTab((unifiedNotchRoot.currentExpandedTab + 1) % 3);
-                    }
-                }
-            }
-
-            // Pagination Dots
-            Row {
-                id: paginationDotsRow
-                anchors.bottom: parent.bottom
-                anchors.bottomMargin: 8
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing
-                spacing: 7
-
-                Repeater {
-                    model: 3
-                    Rectangle {
-                        required property int index
-                        width: unifiedNotchRoot.currentExpandedTab === index ? 16 : 6
-                        height: 6
-                        radius: 3
-                        color: unifiedNotchRoot.currentExpandedTab === index ? unifiedNotchRoot.cfgAccentColor : Qt.rgba(1, 1, 1, 0.25)
-                        Behavior on width { NumberAnimation { duration: 200 } }
-                        Behavior on color { ColorAnimation { duration: 200 } }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: unifiedNotchRoot.requestSwitchTab(parent.index)
+                        var count = unifiedNotchRoot.availableTabs.length;
+                        if (count > 0) {
+                            unifiedNotchRoot.requestSwitchTab((unifiedNotchRoot.currentExpandedTab + 1) % count);
                         }
                     }
                 }

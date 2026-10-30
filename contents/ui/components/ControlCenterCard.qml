@@ -263,9 +263,10 @@ Item {
 
                     RowLayout {
                         spacing: 4
-                        Text {
-                            text: "⚡"
-                            font.pixelSize: 11
+                        Kirigami.Icon {
+                            source: "cpu"
+                            implicitWidth: 12
+                            implicitHeight: 12
                             color: "#9aa0a6"
                         }
                         Text {
@@ -291,9 +292,10 @@ Item {
 
                     RowLayout {
                         spacing: 4
-                        Text {
-                            text: "💾"
-                            font.pixelSize: 10
+                        Kirigami.Icon {
+                            source: "media-flash"
+                            implicitWidth: 12
+                            implicitHeight: 12
                             color: "#9aa0a6"
                         }
                         Text {
@@ -334,9 +336,10 @@ Item {
 
                     RowLayout {
                         spacing: 4
-                        Text {
-                            text: controlCenterRoot.batteryCharging ? "⚡" : "🔋"
-                            font.pixelSize: 11
+                        Kirigami.Icon {
+                            source: controlCenterRoot.batteryCharging ? "battery-charging" : "battery-080"
+                            implicitWidth: 13
+                            implicitHeight: 13
                             color: controlCenterRoot.batteryCharging ? "#34c759" : "#ffffff"
                         }
                         Text {
@@ -350,9 +353,10 @@ Item {
 
                     RowLayout {
                         spacing: 3
-                        Text {
-                            text: "🌡"
-                            font.pixelSize: 10
+                        Kirigami.Icon {
+                            source: "sensor-temperature"
+                            implicitWidth: 12
+                            implicitHeight: 12
                             color: "#9aa0a6"
                         }
                         Text {
@@ -396,10 +400,12 @@ Item {
                         radius: 16
                         color: controlCenterRoot.wifiEnabled ? Qt.rgba(0, 0, 0, 0.08) : Qt.rgba(1, 1, 1, 0.1)
 
-                        Text {
+                        Kirigami.Icon {
                             anchors.centerIn: parent
-                            text: "📶"
-                            font.pixelSize: 13
+                            width: 16
+                            height: 16
+                            source: "network-wireless"
+                            color: controlCenterRoot.wifiEnabled ? "#111418" : "#ffffff"
                         }
                     }
 
@@ -614,14 +620,20 @@ Item {
                             return Qt.rgba(52/255, 199/255, 89/255, 0.25);
                         }
 
-                        Text {
+                        Kirigami.Icon {
                             anchors.centerIn: parent
-                            text: {
-                                if (controlCenterRoot.currentPowerProfile === "performance") return "🚀";
-                                if (controlCenterRoot.currentPowerProfile === "balanced") return "⚖";
-                                return "🌱";
+                            width: 16
+                            height: 16
+                            source: {
+                                if (controlCenterRoot.currentPowerProfile === "performance") return "speedometer";
+                                if (controlCenterRoot.currentPowerProfile === "balanced") return "battery-profile-balanced";
+                                return "battery-profile-powersave";
                             }
-                            font.pixelSize: 13
+                            color: {
+                                if (controlCenterRoot.currentPowerProfile === "performance") return "#ff9f0a";
+                                if (controlCenterRoot.currentPowerProfile === "balanced") return controlCenterRoot.accentColor;
+                                return "#34c759";
+                            }
                         }
                     }
 
@@ -652,9 +664,10 @@ Item {
                         }
                     }
 
-                    Text {
-                        text: "↻"
-                        font.pixelSize: 14
+                    Kirigami.Icon {
+                        implicitWidth: 14
+                        implicitHeight: 14
+                        source: "view-refresh"
                         color: "#8e95a0"
                     }
                 }
@@ -683,10 +696,12 @@ Item {
                 radius: 18
                 color: dndMa1.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "🌙"
-                    font.pixelSize: 14
+                    width: 16
+                    height: 16
+                    source: "weather-clear-night"
+                    color: "#ffffff"
                 }
 
                 MouseArea {
@@ -705,10 +720,12 @@ Item {
                 radius: 18
                 color: controlCenterRoot.dndActive ? Qt.rgba(255/255, 59/255, 48/255, 0.4) : (dndMa2.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1))
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: controlCenterRoot.dndActive ? "🔕" : "🔔"
-                    font.pixelSize: 14
+                    width: 16
+                    height: 16
+                    source: controlCenterRoot.dndActive ? "notifications-disabled" : "notifications"
+                    color: controlCenterRoot.dndActive ? "#ff453a" : "#ffffff"
                 }
 
                 MouseArea {
@@ -727,10 +744,11 @@ Item {
                 radius: 18
                 color: dndMa3.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "㗊"
-                    font.pixelSize: 15
+                    width: 16
+                    height: 16
+                    source: "applications-all"
                     color: "#ffffff"
                 }
 
@@ -750,10 +768,11 @@ Item {
                 radius: 18
                 color: dndMa4.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "⚙"
-                    font.pixelSize: 15
+                    width: 16
+                    height: 16
+                    source: "configure"
                     color: "#ffffff"
                 }
 
@@ -773,11 +792,11 @@ Item {
                 radius: 18
                 color: dndMa5.containsMouse ? Qt.rgba(255/255, 59/255, 48/255, 0.5) : Qt.rgba(1, 1, 1, 0.1)
 
-                Text {
+                Kirigami.Icon {
                     anchors.centerIn: parent
-                    text: "⏻"
-                    font.pixelSize: 14
-                    font.bold: true
+                    width: 16
+                    height: 16
+                    source: "system-shutdown"
                     color: "#ffffff"
                 }
 
@@ -805,9 +824,11 @@ Item {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Text {
-                    text: "🔊"
-                    font.pixelSize: 12
+                Kirigami.Icon {
+                    implicitWidth: 14
+                    implicitHeight: 14
+                    source: controlCenterRoot.currentVolumePct === 0 ? "audio-volume-muted" : "audio-volume-high"
+                    color: "#ffffff"
                 }
 
                 Text {
@@ -875,9 +896,10 @@ Item {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Text {
-                    text: "☼"
-                    font.pixelSize: 13
+                Kirigami.Icon {
+                    implicitWidth: 14
+                    implicitHeight: 14
+                    source: "brightness-high"
                     color: "#ffffff"
                 }
 

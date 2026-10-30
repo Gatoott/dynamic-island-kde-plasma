@@ -1,5 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
+import "../components"
 
 Item {
     id: lyricsPillRoot
@@ -7,27 +9,31 @@ Item {
     property string currentLyricLine: ""
     property color accentColor: "#3daee9"
     property int fontSize: 13
+    property string lyricsFontFamily: ""
+    property bool lyricsFontBold: true
+    property bool showCompactVisualizer: false
+    property bool isPlaying: true
 
     implicitHeight: 34
 
     RowLayout {
         anchors.fill: parent
-        anchors.leftMargin: 14
-        anchors.rightMargin: 14
+        anchors.leftMargin: 12
+        anchors.rightMargin: 12
         anchors.topMargin: 2
-        spacing: 9
+        spacing: 8
 
         // Music icon on the left (Gambar 1)
-        Text {
+        Kirigami.Icon {
             id: noteIcon
-            text: "♫"
-            font.pixelSize: 13
-            font.bold: true
+            source: "audio-x-generic"
+            implicitWidth: 14
+            implicitHeight: 14
             color: lyricsPillRoot.accentColor
             Layout.alignment: Qt.AlignVCenter
         }
 
-        // Active lyric line on the right (Gambar 1)
+        // Active lyric line in the middle
         Item {
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -40,8 +46,8 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 text: lyricsPillRoot.currentLyricLine !== "" ? lyricsPillRoot.currentLyricLine : "..."
                 font.pixelSize: lyricsPillRoot.fontSize
-                font.weight: Font.DemiBold
-                font.family: "Inter, Roboto, sans-serif"
+                font.bold: lyricsPillRoot.lyricsFontBold
+                font.family: lyricsPillRoot.lyricsFontFamily ? lyricsPillRoot.lyricsFontFamily : "Inter, Roboto, sans-serif"
                 color: "#ffffff"
                 elide: Text.ElideRight
                 verticalAlignment: Text.AlignVCenter
@@ -55,5 +61,20 @@ Item {
                 }
             }
         }
+
+        // Optional Mini Audio Visualizer on the right (Toggled via settings)
+        AudioVisualizer {
+            id: miniVisualizer
+            Layout.alignment: Qt.AlignVCenter
+            isPlaying: lyricsPillRoot.isPlaying
+            barColor: lyricsPillRoot.accentColor
+            visible: lyricsPillRoot.showCompactVisualizer
+            barCount: 4
+            barWidth: 2
+            spacing: 2
+            maxHeight: 10
+        }
     }
 }
+
+

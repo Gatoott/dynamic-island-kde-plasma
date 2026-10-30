@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import org.kde.kirigami as Kirigami
 import "../components"
 
 Item {
@@ -11,6 +12,8 @@ Item {
     property string trackArtist: ""
     property color accentColor: "#3daee9"
     property int fontSize: 13
+    property string clockFontFamily: ""
+    property bool clockFontBold: true
     property bool showVisualizer: true
 
     implicitHeight: 34
@@ -21,10 +24,10 @@ Item {
         spacing: 7
 
         // Music note icon (only when media is playing)
-        Text {
-            text: "♫"
-            font.pixelSize: 12
-            font.bold: true
+        Kirigami.Icon {
+            source: "audio-x-generic"
+            implicitWidth: 12
+            implicitHeight: 12
             color: standbyRoot.accentColor
             visible: standbyRoot.isPlaying
             Layout.alignment: Qt.AlignVCenter
@@ -35,8 +38,8 @@ Item {
             id: clockText
             text: standbyRoot.currentTimeString
             font.pixelSize: standbyRoot.fontSize
-            font.weight: Font.DemiBold
-            font.family: "Inter, Roboto, sans-serif"
+            font.bold: standbyRoot.clockFontBold
+            font.family: standbyRoot.clockFontFamily ? standbyRoot.clockFontFamily : "Inter, Roboto, sans-serif"
             color: "#ffffff"
             verticalAlignment: Text.AlignVCenter
             Layout.alignment: Qt.AlignVCenter
@@ -55,3 +58,4 @@ Item {
         }
     }
 }
+

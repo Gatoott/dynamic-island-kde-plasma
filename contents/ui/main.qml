@@ -32,7 +32,23 @@ PlasmoidItem {
     readonly property string cfgIslandShapeMode: Plasmoid.configuration.islandShapeMode || "notch"
     readonly property bool cfgExpandOnHover: Plasmoid.configuration.expandOnHover || false
     readonly property bool cfgShowVisualizer: Plasmoid.configuration.showVisualizer !== undefined ? Plasmoid.configuration.showVisualizer : true
-    readonly property int cfgNotificationDuration: Plasmoid.configuration.notificationDuration || 4500
+    readonly property int cfgNotificationDuration: Plasmoid.configuration.notificationDuration || 4000
+    readonly property bool cfgShowControlTab: Plasmoid.configuration.showControlTab !== undefined ? Plasmoid.configuration.showControlTab : true
+    readonly property bool cfgShowMediaTab: Plasmoid.configuration.showMediaTab !== undefined ? Plasmoid.configuration.showMediaTab : true
+    readonly property bool cfgShowClipboardTab: Plasmoid.configuration.showClipboardTab !== undefined ? Plasmoid.configuration.showClipboardTab : true
+    readonly property bool cfgShowNotificationTab: Plasmoid.configuration.showNotificationTab !== undefined ? Plasmoid.configuration.showNotificationTab : true
+    readonly property string cfgClockFontFamily: {
+        var f = Plasmoid.configuration.clockFontFamily;
+        return (f && f !== "Default (Inter/Roboto)") ? f : "";
+    }
+    readonly property bool cfgClockFontBold: Plasmoid.configuration.clockFontBold !== undefined ? Plasmoid.configuration.clockFontBold : true
+    readonly property string cfgLyricsFontFamily: {
+        var f = Plasmoid.configuration.lyricsFontFamily;
+        return (f && f !== "Default (Inter/Roboto)") ? f : "";
+    }
+    readonly property int cfgLyricsFontSize: Plasmoid.configuration.lyricsFontSize || 13
+    readonly property bool cfgLyricsFontBold: Plasmoid.configuration.lyricsFontBold !== undefined ? Plasmoid.configuration.lyricsFontBold : true
+    readonly property bool cfgShowCompactVisualizer: Plasmoid.configuration.showCompactVisualizer !== undefined ? Plasmoid.configuration.showCompactVisualizer : false
 
     readonly property color cfgBgColor: {
         var c = Plasmoid.configuration.backgroundColor;
@@ -48,18 +64,35 @@ PlasmoidItem {
     property int currentExpandedTab: 0 // 0 = Control Center, 1 = Media Player & Lyrics, 2 = Clipboard
     property int savedPanelHeight: 46
 
-    readonly property bool showPillLyrics: root.showLyrics && root.isPlaying && root.currentLyricLine !== ""
+    readonly property bool showPillLyrics: root.showLyrics && root.isPlaying
 
     readonly property bool inPanel: (Plasmoid.location === PlasmaCore.Types.TopEdge
         || Plasmoid.location === PlasmaCore.Types.BottomEdge
         || Plasmoid.location === PlasmaCore.Types.LeftEdge
         || Plasmoid.location === PlasmaCore.Types.RightEdge)
 
+    TextMetrics {
+        id: notifMetrics
+        font.pixelSize: 12
+        font.weight: Font.Bold
+        font.family: "Inter, Roboto, sans-serif"
+        text: root.notifSummary.length > 0 ? root.notifSummary : (root.notifAppName.length > 0 ? root.notifAppName : "Notification")
+    }
+
     readonly property int currentCompactWidth: {
-        if (root.activeNotificationPill) return 340;
+        if (root.activeNotificationPill) {
+            return Math.max(220, Math.min(380, notifMetrics.advanceWidth + 64));
+        }
         if (root.activeBatteryPill) return 210;
         if (root.showPillLyrics) {
-            return Math.max(root.cfgCompactWidth, Math.min(500, pillLyricsMetrics.advanceWidth + 70));
+            // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer 22 if active) + 24 (left 12 + right 12)
+            var iconW = 14;
+            var gap = 8;
+            var visW = root.cfgShowCompactVisualizer ? 22 : 0;
+            var textW = Math.ceil(pillLyricsMetrics.advanceWidth);
+            var padding = 24;
+            var totalW = iconW + gap + textW + visW + padding;
+            return Math.max(160, Math.min(540, totalW));
         }
         return root.isPlaying ? root.cfgCompactWidth + 30 : root.cfgCompactWidth;
     }
@@ -69,7 +102,7 @@ PlasmoidItem {
             return root.currentCompactWidth;
         }
         if (root.currentExpandedTab === 1 && root.showLyrics) {
-            return 680;
+            return 620;
         }
         return root.cfgExpandedWidth;
     }
@@ -84,10 +117,10 @@ PlasmoidItem {
 
     TextMetrics {
         id: pillLyricsMetrics
-        font.pixelSize: root.cfgClockFontSize
-        font.weight: Font.DemiBold
-        font.family: "Inter, Roboto, sans-serif"
-        text: root.currentLyricLine
+        font.pixelSize: root.cfgLyricsFontSize
+        font.bold: root.cfgLyricsFontBold
+        font.family: root.cfgLyricsFontFamily !== "" ? root.cfgLyricsFontFamily : "Inter, Roboto, sans-serif"
+        text: root.currentLyricLine !== "" ? root.currentLyricLine : (root.trackTitle !== "" ? root.trackTitle : "...")
     }
 
     // --- Clock & Date ---
@@ -138,10 +171,14 @@ PlasmoidItem {
             var currentPosSec = activePlayer.position / 1000000.0;
             var offsetSec = posSeconds - currentPosSec;
             activePlayer.Seek(Math.round(offsetSec * 1000000));
+            root.lastSyncPosition = posSeconds;
+            root.lastSyncTimestamp = Date.now();
+            root.estimatedTrackPosition = posSeconds;
+            root.updateLyricProgress(posSeconds);
         }
     }
 
-    // --- LRCLIB Synced Lyrics Engine (Universal & Fail-safe) ---
+    // --- LRCLIB Synced Lyrics Engine (Universal & Continuous 100ms Precision) ---
     property bool showLyrics: false
     property var lyricsList: []
     property int currentLyricIndex: -1
@@ -150,11 +187,35 @@ PlasmoidItem {
     property bool lyricsFound: false
     property string lastFetchedKey: ""
 
+    property real lastSyncPosition: 0
+    property double lastSyncTimestamp: 0
+    property real estimatedTrackPosition: 0
+
+    Timer {
+        id: lyricsSyncTimer
+        interval: 100
+        repeat: true
+        running: root.isPlaying
+        onTriggered: {
+            if (!root.isPlaying) return;
+            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
+            var estPos = root.lastSyncPosition + elapsedSec;
+            if (root.trackLength > 0 && estPos > root.trackLength) {
+                estPos = root.trackLength;
+            }
+            root.estimatedTrackPosition = estPos;
+            root.updateLyricProgress(estPos);
+        }
+    }
+
     onTrackTitleChanged: {
         currentLyricIndex = -1;
         currentLyricLine = "";
         lyricsList = [];
         lyricsFound = false;
+        lastSyncPosition = 0;
+        lastSyncTimestamp = Date.now();
+        estimatedTrackPosition = 0;
         if (trackTitle && trackTitle.length > 0) {
             fetchLyrics(true);
         }
@@ -167,8 +228,24 @@ PlasmoidItem {
     }
 
     onTrackPositionChanged: {
+        lastSyncPosition = trackPosition;
+        lastSyncTimestamp = Date.now();
+        estimatedTrackPosition = trackPosition;
+        updateLyricProgress(trackPosition);
+    }
+
+    onIsPlayingChanged: {
+        lastSyncPosition = trackPosition;
+        lastSyncTimestamp = Date.now();
+        estimatedTrackPosition = trackPosition;
+        if (isPlaying) {
+            lyricsSyncTimer.restart();
+        }
+        updateLyricProgress(trackPosition);
+    }
+
+    function updateLyricProgress(pos) {
         if (!lyricsList || lyricsList.length === 0) return;
-        var pos = trackPosition;
         var idx = -1;
         for (var i = 0; i < lyricsList.length; i++) {
             if (lyricsList[i].time <= pos) {
@@ -400,54 +477,82 @@ PlasmoidItem {
         }
     }
 
-    // --- Global Notifications Monitor (WatchedNotificationsModel) ---
+    // --- Global Notifications Monitor (WatchedNotificationsModel & Session History) ---
     property bool activeNotificationPill: false
     property string notifAppName: ""
     property string notifSummary: ""
     property string notifBody: ""
     property string notifIcon: ""
+    property var notificationHistory: []
 
     Timer {
         id: notifDismissTimer
-        interval: root.cfgNotificationDuration
+        interval: 4000
         repeat: false
         onTriggered: {
             root.activeNotificationPill = false;
         }
     }
 
+    function addNotification(app, summary, body, icon) {
+        var now = new Date();
+        var timeStr = Qt.formatTime(now, "hh:mm");
+        var item = {
+            id: Date.now() + "_" + Math.floor(Math.random() * 10000),
+            appName: app || "System",
+            app: app || "System",
+            summary: summary || (app || "Notification"),
+            body: body || "",
+            icon: icon || "preferences-desktop-notification",
+            time: timeStr
+        };
+        var list = root.notificationHistory.slice(0);
+        list.unshift(item);
+        if (list.length > 40) list = list.slice(0, 40);
+        root.notificationHistory = list;
+
+        // Trigger compact notification pill (title only)
+        root.notifAppName = app || "";
+        root.notifSummary = summary || (app || "Notification");
+        root.notifBody = body || "";
+        root.notifIcon = icon || "preferences-desktop-notification";
+
+        if (!root.isExpanded) {
+            root.activeNotificationPill = true;
+            notifDismissTimer.interval = 4000;
+            notifDismissTimer.restart();
+        }
+    }
+
+    function removeNotification(notifId) {
+        var list = root.notificationHistory.filter(function(item) {
+            return item.id !== notifId;
+        });
+        root.notificationHistory = list;
+    }
+
+    function clearAllNotifications() {
+        root.notificationHistory = [];
+    }
+
     NotificationManager.WatchedNotificationsModel {
         id: watchedNotifications
 
         onRowsInserted: (parent, first, last) => {
-            if (root.isExpanded) return;
-            try {
-                var idx = watchedNotifications.index(last, 0);
-                var summary = "";
-                var body = "";
-                var app = "";
-                var icon = "";
+            for (var r = first; r <= last; r++) {
+                try {
+                    var idx = watchedNotifications.index(r, 0);
+                    var summary = watchedNotifications.data(idx, 0) || "";
+                    var body = watchedNotifications.data(idx, 266) || "";
+                    var app = watchedNotifications.data(idx, 270) || "";
+                    var appIcon = watchedNotifications.data(idx, 271) || watchedNotifications.data(idx, 267) || "";
 
-                var roles = watchedNotifications.roleNames();
-                for (var key in roles) {
-                    var rName = roles[key];
-                    var roleNum = Number(key);
-                    if (rName === "summary") summary = watchedNotifications.data(idx, roleNum) || "";
-                    else if (rName === "body") body = watchedNotifications.data(idx, roleNum) || "";
-                    else if (rName === "applicationName") app = watchedNotifications.data(idx, roleNum) || "";
-                    else if (rName === "applicationIconName" || rName === "iconName") icon = watchedNotifications.data(idx, roleNum) || "";
+                    if (summary !== "" || body !== "" || app !== "") {
+                        root.addNotification(app, summary, body, appIcon);
+                    }
+                } catch (e) {
+                    console.log("Error processing notification row:", e);
                 }
-
-                if (summary !== "" || body !== "") {
-                    root.notifAppName = app;
-                    root.notifSummary = summary;
-                    root.notifBody = body;
-                    root.notifIcon = icon || "preferences-desktop-notification";
-                    root.activeNotificationPill = true;
-                    notifDismissTimer.restart();
-                }
-            } catch (e) {
-                console.log("Error processing notification:", e);
             }
         }
     }
@@ -455,7 +560,23 @@ PlasmoidItem {
     // --- Independent Window Surface State (NON-REACTIVE TO isExpanded) ---
     property bool dialogSurfaceOpen: false
 
+    // Timer Fallback Penutupan Dialog (Mencegah Deadlock):
+    Timer {
+        id: closeWatchdogTimer
+        interval: 380 // Sedikit lebih lama dari durasi animasi 280ms
+        repeat: false
+        onTriggered: {
+            if (!root.isExpanded) {
+                console.log("[NOTCH] Watchdog: Memastikan dialog tertutup dan notch panel aktif");
+                root.dialogSurfaceOpen = false;
+            }
+        }
+    }
+
     function openNotch() {
+        if (closeWatchdogTimer.running) {
+            closeWatchdogTimer.stop();
+        }
         root.activeNotificationPill = false;
         root.activeBatteryPill = false;
         if (root.inPanel) {
@@ -478,8 +599,8 @@ PlasmoidItem {
         if (!root.isExpanded) return;
 
         console.log("[NOTCH] T=0ms: Mulai animasi ciut fisik...");
-        root.isExpanded = false; // Ini HANYA memicu targetH -> compactHeight (36)
-        // DIALOG TETAP DIBIARKAN HIDUP: dialogSurfaceOpen TETAP true!
+        root.isExpanded = false; // Memicu targetH -> compactHeight (36)
+        closeWatchdogTimer.restart(); // Jalankan timer pengaman anti-deadlock
     }
 
     function toggleExpanded() {
@@ -496,7 +617,7 @@ PlasmoidItem {
     // ==============================================================
     Item {
         id: panelNotchContainer
-        visible: root.inPanel && !root.dialogSurfaceOpen
+        visible: root.inPanel && !root.isExpanded
         width: panelCompactNotch.width
         height: root.cfgCompactHeight
 
@@ -505,10 +626,8 @@ PlasmoidItem {
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
-        // Switch opacity secara instan saat dialog overlay terbuka/tertutup
-        // TANPA Behavior on opacity agar tidak ada desinkronisasi atau celah waktu
-        opacity: root.dialogSurfaceOpen ? 0.0 : 1.0
-        enabled: !root.dialogSurfaceOpen
+        opacity: root.isExpanded ? 0.0 : 1.0
+        enabled: !root.isExpanded
 
         CompactView {
             id: panelCompactNotch
@@ -524,7 +643,13 @@ PlasmoidItem {
             cfgBgColor: root.cfgBgColor
             cfgBorderColor: root.cfgBorderColor
             cfgClockFontSize: root.cfgClockFontSize
+            cfgClockFontFamily: root.cfgClockFontFamily
+            cfgClockFontBold: root.cfgClockFontBold
+            cfgLyricsFontFamily: root.cfgLyricsFontFamily
+            cfgLyricsFontSize: root.cfgLyricsFontSize
+            cfgLyricsFontBold: root.cfgLyricsFontBold
             cfgShowVisualizer: root.cfgShowVisualizer
+            cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
 
             // Compact state bindings
             activeNotificationPill: root.activeNotificationPill
@@ -607,6 +732,17 @@ PlasmoidItem {
                 currentTimeString: root.currentTimeString
                 islandShapeMode: root.cfgIslandShapeMode
 
+                showControlTab: root.cfgShowControlTab
+                showMediaTab: root.cfgShowMediaTab
+                showClipboardTab: root.cfgShowClipboardTab
+                showNotificationTab: root.cfgShowNotificationTab
+
+                cfgClockFontFamily: root.cfgClockFontFamily
+                cfgClockFontBold: root.cfgClockFontBold
+                cfgLyricsFontFamily: root.cfgLyricsFontFamily
+                cfgLyricsFontSize: root.cfgLyricsFontSize
+                cfgLyricsFontBold: root.cfgLyricsFontBold
+
                 // Compact state bindings (identik dengan panelCompactNotch)
                 activeNotificationPill: root.activeNotificationPill
                 notifAppName: root.notifAppName
@@ -617,8 +753,10 @@ PlasmoidItem {
                 batteryIsCharging: root.batteryIsCharging
                 showPillLyrics: root.showPillLyrics
                 currentLyricLine: root.currentLyricLine
+                currentDateString: root.currentDateString
                 cfgClockFontSize: root.cfgClockFontSize
                 cfgShowVisualizer: root.cfgShowVisualizer
+                cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
 
                 sysCpuPct: root.sysCpuPct
                 sysTemp: root.sysTemp
@@ -626,11 +764,13 @@ PlasmoidItem {
                 sysBatteryPct: root.sysBatteryPct
                 sysBatteryCharging: root.sysBatteryCharging
 
+                notificationHistory: root.notificationHistory
+
                 trackTitle: root.trackTitle
                 trackArtist: root.trackArtist
                 trackAlbum: root.trackAlbum
                 albumArtUrl: root.albumArtUrl
-                trackPosition: root.trackPosition
+                trackPosition: root.estimatedTrackPosition
                 trackLength: root.trackLength
                 isPlaying: root.isPlaying
                 canControl: root.canControl
@@ -654,14 +794,33 @@ PlasmoidItem {
                         root.fetchLyrics(true);
                     }
                 }
+                onRequestCloseLyrics: root.showLyrics = false
                 onRequestRetryLyrics: root.fetchLyrics(true)
+                onRequestDemoLyrics: {
+                    root.lyricsList = [
+                        { time: 0, text: "Paper Sky - Lumen Coast" },
+                        { time: 4, text: "Drifting slowly into the blue" },
+                        { time: 8, text: "Fold the pages, make them new" },
+                        { time: 14, text: "and send them through the sky" },
+                        { time: 20, text: "to find you by the sea" },
+                        { time: 26, text: "Where memories are waiting" },
+                        { time: 32, text: "Listening to the waves call out" },
+                        { time: 40, text: "Underneath the summer glow" }
+                    ];
+                    root.lyricsFound = true;
+                    root.lyricsLoading = false;
+                }
+                onRequestClearAllNotifications: root.clearAllNotifications()
+                onRequestRemoveNotification: (id) => root.removeNotification(id)
 
                 onCollapseCompleted: {
                     console.log("[NOTCH] T=300ms: Buffer transparan ter-flush, dialog dimatikan dan notch panel dimunculkan.");
+                    closeWatchdogTimer.stop();
                     root.dialogSurfaceOpen = false;
                 }
 
                 onCollapseFinished: {
+                    closeWatchdogTimer.stop();
                     root.dialogSurfaceOpen = false;
                 }
             }
@@ -695,6 +854,17 @@ PlasmoidItem {
         currentTimeString: root.currentTimeString
         islandShapeMode: root.cfgIslandShapeMode
 
+        showControlTab: root.cfgShowControlTab
+        showMediaTab: root.cfgShowMediaTab
+        showClipboardTab: root.cfgShowClipboardTab
+        showNotificationTab: root.cfgShowNotificationTab
+
+        cfgClockFontFamily: root.cfgClockFontFamily
+        cfgClockFontBold: root.cfgClockFontBold
+        cfgLyricsFontFamily: root.cfgLyricsFontFamily
+        cfgLyricsFontSize: root.cfgLyricsFontSize
+        cfgLyricsFontBold: root.cfgLyricsFontBold
+
         // Compact state bindings
         activeNotificationPill: root.activeNotificationPill
         notifAppName: root.notifAppName
@@ -705,8 +875,10 @@ PlasmoidItem {
         batteryIsCharging: root.batteryIsCharging
         showPillLyrics: root.showPillLyrics
         currentLyricLine: root.currentLyricLine
+        currentDateString: root.currentDateString
         cfgClockFontSize: root.cfgClockFontSize
         cfgShowVisualizer: root.cfgShowVisualizer
+        cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
 
         sysCpuPct: root.sysCpuPct
         sysTemp: root.sysTemp
@@ -714,11 +886,13 @@ PlasmoidItem {
         sysBatteryPct: root.sysBatteryPct
         sysBatteryCharging: root.sysBatteryCharging
 
+        notificationHistory: root.notificationHistory
+
         trackTitle: root.trackTitle
         trackArtist: root.trackArtist
         trackAlbum: root.trackAlbum
         albumArtUrl: root.albumArtUrl
-        trackPosition: root.trackPosition
+        trackPosition: root.estimatedTrackPosition
         trackLength: root.trackLength
         isPlaying: root.isPlaying
         canControl: root.canControl
@@ -742,7 +916,24 @@ PlasmoidItem {
                 root.fetchLyrics(true);
             }
         }
+        onRequestCloseLyrics: root.showLyrics = false
         onRequestRetryLyrics: root.fetchLyrics(true)
+        onRequestDemoLyrics: {
+            root.lyricsList = [
+                { time: 0, text: "Paper Sky - Lumen Coast" },
+                { time: 4, text: "Drifting slowly into the blue" },
+                { time: 8, text: "Fold the pages, make them new" },
+                { time: 14, text: "and send them through the sky" },
+                { time: 20, text: "to find you by the sea" },
+                { time: 26, text: "Where memories are waiting" },
+                { time: 32, text: "Listening to the waves call out" },
+                { time: 40, text: "Underneath the summer glow" }
+            ];
+            root.lyricsFound = true;
+            root.lyricsLoading = false;
+        }
+        onRequestClearAllNotifications: root.clearAllNotifications()
+        onRequestRemoveNotification: (id) => root.removeNotification(id)
     }
 }
 
