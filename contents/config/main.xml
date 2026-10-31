@@ -40,7 +40,13 @@
       <default>13</default>
     </entry>
     <entry name="notchCornerRadius" type="Int">
-      <default>18</default>
+      <default>14</default>
+    </entry>
+    <entry name="notchBottomRadius" type="Int">
+      <default>14</default>
+    </entry>
+    <entry name="notchWingRadius" type="Int">
+      <default>14</default>
     </entry>
 
     <!-- Appearance -->

@@ -242,8 +242,10 @@ Item {
     // =============================================================
     ColumnLayout {
         anchors.fill: parent
-        anchors.margins: 14
+        anchors.leftMargin: 44
+        anchors.rightMargin: 44
         anchors.topMargin: 8
+        anchors.bottomMargin: 14
         spacing: 11
 
         // ---------------------------------------------------------

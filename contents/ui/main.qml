@@ -25,7 +25,13 @@ PlasmoidItem {
     readonly property int cfgExpandedWidth: Plasmoid.configuration.expandedWidth || 420
     readonly property int cfgExpandedHeight: Plasmoid.configuration.expandedHeight || 335
     readonly property int cfgBorderRadius: Plasmoid.configuration.borderRadius || 18
-    readonly property int cfgNotchCornerRadius: Plasmoid.configuration.notchCornerRadius || 18
+    readonly property int cfgNotchBottomRadius: Plasmoid.configuration.notchBottomRadius !== undefined 
+        ? Plasmoid.configuration.notchBottomRadius 
+        : (Plasmoid.configuration.notchCornerRadius !== undefined ? Plasmoid.configuration.notchCornerRadius : 14)
+    readonly property int cfgNotchWingRadius: Plasmoid.configuration.notchWingRadius !== undefined 
+        ? Plasmoid.configuration.notchWingRadius 
+        : 14
+    readonly property int cfgNotchCornerRadius: cfgNotchBottomRadius
     readonly property int cfgHorizontalOffset: Plasmoid.configuration.horizontalOffset !== undefined ? Plasmoid.configuration.horizontalOffset : 0
     readonly property int cfgClockFontSize: Plasmoid.configuration.clockFontSize || 13
     readonly property string cfgIslandShapeMode: Plasmoid.configuration.islandShapeMode || "notch"
@@ -39,13 +45,10 @@ PlasmoidItem {
     }
     readonly property bool isFloatingStyle: cfgNotchStyle === 1 || cfgIslandShapeMode === "dock" || cfgIslandShapeMode === "pill" || cfgIslandShapeMode === "circle"
 
-    // Ambil nilai dari konfigurasi (default 10 jika mode floating, default 0 jika living notch)
-    readonly property int cfgVerticalOffset: {
-        if (Plasmoid.configuration.verticalOffset !== undefined) {
-            return Plasmoid.configuration.verticalOffset;
-        }
-        return root.isFloatingStyle ? 10 : 0;
-    }
+    // Tetap baca nilai custom margin dari pengaturan plasmoid:
+    property int cfgVerticalOffset: Plasmoid.configuration.verticalOffset !== undefined 
+        ? Plasmoid.configuration.verticalOffset 
+        : 0
 
     // Gunakan nilai konfigurasi secara langsung tanpa batasan buatan:
     readonly property int effectiveVerticalOffset: root.cfgVerticalOffset
@@ -90,6 +93,17 @@ PlasmoidItem {
         || Plasmoid.location === PlasmaCore.Types.BottomEdge
         || Plasmoid.location === PlasmaCore.Types.LeftEdge
         || Plasmoid.location === PlasmaCore.Types.RightEdge)
+
+    readonly property real panelThickness: {
+        if (!root.inPanel) return 0;
+        if (typeof plasmoid !== "undefined" && plasmoid.containment && plasmoid.containment.height > 0) {
+            return plasmoid.containment.height;
+        }
+        if (Plasmoid.containment && Plasmoid.containment.height > 0) {
+            return Plasmoid.containment.height;
+        }
+        return root.savedPanelHeight > 0 ? root.savedPanelHeight : 36;
+    }
 
     TextMetrics {
         id: notifMetrics
@@ -698,6 +712,23 @@ PlasmoidItem {
     property bool batteryIsCharging: false
     property int lastPluggedInState: -1
 
+    function handleBatteryStateChange(isCharging) {
+        root.sysBatteryCharging = isCharging;
+        root.batteryIsCharging = isCharging;
+        var current = isCharging ? 1 : 0;
+        if (root.lastPluggedInState === -1) {
+            root.lastPluggedInState = current;
+            return;
+        }
+        if (current !== root.lastPluggedInState) {
+            root.lastPluggedInState = current;
+            if (!root.isExpanded) {
+                root.activeBatteryPill = true;
+                batteryDismissTimer.restart();
+            }
+        }
+    }
+
     Timer {
         id: batteryDismissTimer
         interval: 3000
@@ -707,26 +738,94 @@ PlasmoidItem {
         }
     }
 
+    // 1. Plasma Native Battery Control Model
     Battery.BatteryControlModel {
         id: batteryModel
 
-        onPluggedInChanged: {
-            if (root.lastPluggedInState === -1) {
-                root.lastPluggedInState = batteryModel.pluggedIn ? 1 : 0;
-                root.sysBatteryCharging = batteryModel.pluggedIn;
-                return;
+        onPercentChanged: {
+            if (batteryModel.percent !== undefined && batteryModel.percent > 0) {
+                root.sysBatteryPct = batteryModel.percent;
             }
-            var current = batteryModel.pluggedIn ? 1 : 0;
-            if (current !== root.lastPluggedInState) {
-                root.lastPluggedInState = current;
-                root.batteryIsCharging = batteryModel.pluggedIn;
-                root.sysBatteryCharging = batteryModel.pluggedIn;
-                if (!root.isExpanded) {
-                    root.activeBatteryPill = true;
-                    batteryDismissTimer.restart();
+        }
+
+        onPluggedInChanged: {
+            root.handleBatteryStateChange(batteryModel.pluggedIn);
+        }
+
+        Component.onCompleted: {
+            if (batteryModel.percent !== undefined && batteryModel.percent > 0) {
+                root.sysBatteryPct = batteryModel.percent;
+            }
+            root.handleBatteryStateChange(batteryModel.pluggedIn);
+        }
+    }
+
+    // 2. UPower DisplayDevice D-Bus Reactive Properties
+    DBus.Properties {
+        id: upowerDisplayDeviceProps
+        busType: DBus.BusType.System
+        service: "org.freedesktop.UPower"
+        path: "/org/freedesktop/UPower/devices/DisplayDevice"
+        iface: "org.freedesktop.UPower.Device"
+
+        onPropertiesChanged: {
+            if (typeof properties !== "undefined" && properties !== null) {
+                if (properties.Percentage !== undefined) {
+                    var p = Math.round(properties.Percentage);
+                    if (!isNaN(p) && p > 0) {
+                        root.sysBatteryPct = p;
+                    }
+                }
+                if (properties.State !== undefined) {
+                    var isCharging = (properties.State === 1);
+                    root.handleBatteryStateChange(isCharging);
                 }
             }
         }
+    }
+
+    // 3. Periodic Polling & D-Bus Fallback (interval 6000ms)
+    DBusCall {
+        id: dbusBatteryGet
+        busType: DBus.BusType.System
+        service: "org.freedesktop.UPower"
+        path: "/org/freedesktop/UPower/devices/DisplayDevice"
+        iface: "org.freedesktop.DBus.Properties"
+        member: "Get"
+    }
+
+    Timer {
+        id: batteryPollTimer
+        interval: 6000
+        running: true
+        repeat: true
+        triggeredOnStart: true
+        onTriggered: {
+            root.refreshBatteryStatus();
+        }
+    }
+
+    function refreshBatteryStatus() {
+        if (typeof batteryModel !== "undefined" && batteryModel.hasBatteries && batteryModel.percent !== undefined && batteryModel.percent > 0) {
+            root.sysBatteryPct = batteryModel.percent;
+            root.handleBatteryStateChange(batteryModel.pluggedIn);
+        }
+        dbusBatteryGet.call("Get", ["org.freedesktop.UPower.Device", "Percentage"], (reply) => {
+            if (reply && reply.value !== undefined) {
+                var p = Math.round(reply.value);
+                if (!isNaN(p) && p > 0) {
+                    root.sysBatteryPct = p;
+                }
+            }
+        });
+        dbusBatteryGet.call("Get", ["org.freedesktop.UPower.Device", "State"], (reply) => {
+            if (reply && reply.value !== undefined) {
+                var st = parseInt(reply.value);
+                if (!isNaN(st)) {
+                    root.handleBatteryStateChange(st === 1);
+                }
+            }
+        });
     }
 
     // --- Global Notifications Monitor (WatchedNotificationsModel & Session History) ---
@@ -821,6 +920,7 @@ PlasmoidItem {
             if (!root.isExpanded) {
                 console.log("[NOTCH] Watchdog: Memastikan dialog tertutup dan notch panel aktif");
                 root.dialogSurfaceOpen = false;
+                panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
             }
         }
     }
@@ -829,14 +929,26 @@ PlasmoidItem {
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
+        if (root.isExpanded) return;
+
         root.activeNotificationPill = false;
         root.activeBatteryPill = false;
-        if (root.inPanel) {
-            root.dialogSurfaceOpen = true; // Munculkan kanvas transparan terlebih dahulu
-            root.isExpanded = true;        // Baru picu animasi melar targetH & targetW ke bawah
-        } else {
-            root.isExpanded = true;
-        }
+
+        // Posisikan jendela dialog tepat di tengah atas layar:
+        expandedDialog.x = Math.round((Screen.width - expandedDialog.width) / 2) + root.cfgHorizontalOffset;
+        expandedDialog.y = root.isFloatingStyle ? root.effectiveVerticalOffset : 0;
+
+        // Inisialisasi dimensi awal kartu sebelum dibuka:
+        expandedCardPanel.width = expandedCardPanel.isFloatingStyle 
+            ? root.currentCompactWidth 
+            : (root.currentCompactWidth + (expandedCardPanel.effectiveWingRadius * 2));
+        expandedCardPanel.height = root.cfgCompactHeight;
+        expandedCardPanel.opacity = 1.0;
+        expandedCardPanel.bodyOpacity = 1.0;
+
+        root.dialogSurfaceOpen = true;
+        panelNotchContainer.visible = false;
+        root.isExpanded = true;
     }
 
     function expandNotch() {
@@ -888,8 +1000,8 @@ PlasmoidItem {
 
             notchW: root.currentCompactWidth
             notchH: root.cfgCompactHeight
-            wingR: 14
-            cornerR: 18
+            wingR: root.cfgNotchWingRadius
+            cornerR: root.cfgNotchBottomRadius
             notchStyle: root.cfgNotchStyle
             islandShapeMode: root.cfgIslandShapeMode
 
@@ -936,8 +1048,9 @@ PlasmoidItem {
         width: 720
         height: 480
         // Lepaskan ikatan visualParent: atur koordinat absolut terhadap layar (menempel di tengah atas)
-        x: Math.round((Screen.desktopAvailableWidth - width) / 2) + root.cfgHorizontalOffset
-        y: root.effectiveVerticalOffset
+        x: Math.round((Screen.width - width) / 2) + root.cfgHorizontalOffset
+        y: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
+        location: PlasmaCore.Types.Floating
         type: PlasmaCore.Dialog.Normal
         flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.BypassWindowManagerHint | Qt.NoDropShadowWindowHint
         backgroundHints: PlasmaCore.Types.NoBackground
@@ -953,11 +1066,13 @@ PlasmoidItem {
 
         mainItem: Item {
             id: fixedCanvas
+            clip: false
             implicitWidth: 720
             implicitHeight: 480
             width: 720
             height: 480
             anchors.top: parent.top
+            anchors.topMargin: 0
             y: 0
 
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
@@ -969,7 +1084,7 @@ PlasmoidItem {
             ExpandedNotchCard {
                 id: expandedCardPanel
                 anchors.top: parent.top
-                y: 0
+                anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
                 anchors.horizontalCenter: parent.horizontalCenter
                 isOverlayDialog: true
                 compactWidth: root.currentCompactWidth
@@ -977,6 +1092,8 @@ PlasmoidItem {
                 isExpanded: root.isExpanded
                 notchStyle: root.cfgNotchStyle
                 islandShapeMode: root.cfgIslandShapeMode
+                cfgNotchWingRadius: root.cfgNotchWingRadius
+                cfgNotchBottomRadius: root.cfgNotchBottomRadius
 
                 cfgAccentColor: root.cfgAccentColor
                 cfgBgColor: root.cfgBgColor
@@ -1076,11 +1193,13 @@ PlasmoidItem {
                     console.log("[NOTCH] T=300ms: Buffer transparan ter-flush, dialog dimatikan dan notch panel dimunculkan.");
                     closeWatchdogTimer.stop();
                     root.dialogSurfaceOpen = false;
+                    panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
                 }
 
                 onCollapseFinished: {
                     closeWatchdogTimer.stop();
                     root.dialogSurfaceOpen = false;
+                    panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
                 }
             }
         }
@@ -1104,6 +1223,8 @@ PlasmoidItem {
         isExpanded: root.isExpanded
         notchStyle: root.cfgNotchStyle
         islandShapeMode: root.cfgIslandShapeMode
+        cfgNotchWingRadius: root.cfgNotchWingRadius
+        cfgNotchBottomRadius: root.cfgNotchBottomRadius
 
         cfgAccentColor: root.cfgAccentColor
         cfgBgColor: root.cfgBgColor

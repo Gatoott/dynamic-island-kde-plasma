@@ -11,8 +11,16 @@ Item {
     // Properties
     property real notchW: 190
     property real notchH: 34
-    property real wingR: 14     // Radius cekukan sayap
-    property real cornerR: 18   // Radius sudut cembung bawah
+    property real wingR: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.notchWingRadius !== undefined) return plasmoid.configuration.notchWingRadius;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.notchWingRadius !== undefined) return Plasmoid.configuration.notchWingRadius;
+        return 14;
+    }
+    property real cornerR: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.notchBottomRadius !== undefined) return plasmoid.configuration.notchBottomRadius;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.notchBottomRadius !== undefined) return Plasmoid.configuration.notchBottomRadius;
+        return 14;
+    }
 
     // Style & Shape Options
     property int notchStyle: 0
@@ -124,8 +132,8 @@ Item {
             PathArc {
                 x: compactNotchRoot.wingR + compactNotchRoot.cornerR
                 y: compactNotchRoot.notchH
-                radiusX: compactNotchRoot.cornerR
-                radiusY: compactNotchRoot.cornerR
+                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
+                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
                 direction: PathArc.Counterclockwise
             }
 
@@ -139,8 +147,8 @@ Item {
             PathArc {
                 x: compactNotchRoot.width - compactNotchRoot.wingR
                 y: compactNotchRoot.notchH - compactNotchRoot.cornerR
-                radiusX: compactNotchRoot.cornerR
-                radiusY: compactNotchRoot.cornerR
+                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
+                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
                 direction: PathArc.Counterclockwise
             }
 
@@ -190,8 +198,8 @@ Item {
             PathArc {
                 x: compactNotchRoot.wingR + compactNotchRoot.cornerR
                 y: compactNotchRoot.notchH
-                radiusX: compactNotchRoot.cornerR
-                radiusY: compactNotchRoot.cornerR
+                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
+                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
                 direction: PathArc.Counterclockwise
             }
 
@@ -205,8 +213,8 @@ Item {
             PathArc {
                 x: compactNotchRoot.width - compactNotchRoot.wingR
                 y: compactNotchRoot.notchH - compactNotchRoot.cornerR
-                radiusX: compactNotchRoot.cornerR
-                radiusY: compactNotchRoot.cornerR
+                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
+                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
                 direction: PathArc.Counterclockwise
             }
 

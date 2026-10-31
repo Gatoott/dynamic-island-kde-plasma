@@ -194,7 +194,7 @@ Item {
     Item {
         id: headerClockContainer
         anchors.top: parent.top
-        anchors.topMargin: 6
+        anchors.topMargin: 10
         anchors.horizontalCenter: parent.horizontalCenter
         height: headerClockColumn.implicitHeight
         z: 5
@@ -247,7 +247,7 @@ Item {
     AudioVisualizer {
         id: modeAVisualizer
         anchors.right: parent.right
-        anchors.rightMargin: 36
+        anchors.rightMargin: 20
         anchors.verticalCenter: headerClockContainer.verticalCenter
         visible: !mediaCardRoot.showLyrics
         isPlaying: mediaCardRoot.isPlaying
@@ -269,9 +269,9 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
         anchors.left: parent.left
-        anchors.leftMargin: 36   // Beri ruang untuk tombol panah navigasi kiri
+        anchors.leftMargin: 44   // Internal padding agar kontrol/artwork tidak tertabrak tombol panah melayang
         anchors.right: parent.right
-        anchors.rightMargin: 36  // Beri ruang untuk tombol panah navigasi kanan
+        anchors.rightMargin: 44  // Internal padding agar slider volume tidak tertabrak tombol panah melayang
         visible: !mediaCardRoot.showLyrics
 
         ColumnLayout {
@@ -627,9 +627,9 @@ Item {
         anchors.bottom: parent.bottom
         anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
         anchors.left: parent.left
-        anchors.leftMargin: 36   // Beri ruang untuk tombol panah navigasi kiri
+        anchors.leftMargin: 44   // Internal padding agar kontrol tidak tertabrak tombol panah melayang
         anchors.right: parent.right
-        anchors.rightMargin: 36  // Beri ruang untuk tombol panah navigasi kanan
+        anchors.rightMargin: 44  // Internal padding agar teks lirik tidak tertabrak tombol panah melayang
         visible: mediaCardRoot.showLyrics
         clip: true
 

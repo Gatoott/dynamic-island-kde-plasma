@@ -95,6 +95,10 @@ Item {
 
     ColumnLayout {
         anchors.fill: parent
+        anchors.leftMargin: 44
+        anchors.rightMargin: 44
+        anchors.topMargin: 14
+        anchors.bottomMargin: 14
         spacing: 10
 
         // --- Header ---

@@ -10,6 +10,11 @@ Item {
     id: unifiedNotchRoot
     clip: false
 
+    // Pastikan root item kartu menempel kokoh di bibir atas container:
+    anchors.top: parent ? parent.top : undefined
+    anchors.topMargin: (typeof root !== "undefined" && root.isFloatingStyle) ? root.effectiveVerticalOffset : 0
+    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+
     // State
     property bool isExpanded: false
     property int currentExpandedTab: 0
@@ -116,9 +121,20 @@ Item {
     property real bodyOpacity: 1.0
     property bool isOverlayDialog: false
 
-    readonly property real wingRadius: 14
+    property real cfgNotchWingRadius: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.notchWingRadius !== undefined) return plasmoid.configuration.notchWingRadius;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.notchWingRadius !== undefined) return Plasmoid.configuration.notchWingRadius;
+        return 14;
+    }
+    property real cfgNotchBottomRadius: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.notchBottomRadius !== undefined) return plasmoid.configuration.notchBottomRadius;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.notchBottomRadius !== undefined) return Plasmoid.configuration.notchBottomRadius;
+        return 14;
+    }
+
+    readonly property real wingRadius: cfgNotchWingRadius
     readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
-    property real cornerRadius: isExpanded ? 22 : 18
+    property real cornerRadius: cfgNotchBottomRadius
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
     // Pemetaan Dimensi Eksplisit Tiap Tab (Anti-NaN & Anti-Squish)
@@ -189,6 +205,13 @@ Item {
     onIsExpandedChanged: {
         if (isExpanded) {
             unifiedNotchRoot.bodyOpacity = 1.0;
+            unifiedNotchRoot.opacity = 1.0;
+            unifiedNotchRoot.width = Qt.binding(function() {
+                return unifiedNotchRoot.isFloatingStyle ? unifiedNotchRoot.targetW : (unifiedNotchRoot.targetW + (unifiedNotchRoot.effectiveWingRadius * 2));
+            });
+            unifiedNotchRoot.height = Qt.binding(function() {
+                return unifiedNotchRoot.targetH;
+            });
         } else {
             // Jika selisih tinggi sudah sangat kecil, langsung selesaikan tanpa menunggu animasi
             if (Math.abs(unifiedNotchRoot.height - compactHeight) < 2) {
@@ -297,8 +320,8 @@ Item {
             PathArc {
                 x: unifiedNotchRoot.wingRadius + unifiedNotchRoot.cornerRadius
                 y: unifiedNotchRoot.targetH
-                radiusX: unifiedNotchRoot.cornerRadius
-                radiusY: unifiedNotchRoot.cornerRadius
+                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
+                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 direction: PathArc.Counterclockwise
             }
 
@@ -312,8 +335,8 @@ Item {
             PathArc {
                 x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
                 y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
-                radiusX: unifiedNotchRoot.cornerRadius
-                radiusY: unifiedNotchRoot.cornerRadius
+                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
+                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 direction: PathArc.Counterclockwise
             }
 
@@ -364,8 +387,8 @@ Item {
             PathArc {
                 x: unifiedNotchRoot.wingRadius + unifiedNotchRoot.cornerRadius
                 y: unifiedNotchRoot.targetH
-                radiusX: unifiedNotchRoot.cornerRadius
-                radiusY: unifiedNotchRoot.cornerRadius
+                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
+                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 direction: PathArc.Counterclockwise
             }
 
@@ -379,8 +402,8 @@ Item {
             PathArc {
                 x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
                 y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
-                radiusX: unifiedNotchRoot.cornerRadius
-                radiusY: unifiedNotchRoot.cornerRadius
+                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
+                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 direction: PathArc.Counterclockwise
             }
 
@@ -547,7 +570,7 @@ Item {
                 }
             }
 
-            // Cards Body Area - Fills notch body completely
+            // Cards Body Area - Fills notch body completely (Full-Bleed)
             Item {
                 id: cardBodyContainer
                 anchors.fill: parent
@@ -696,14 +719,14 @@ Item {
                 }
             }
 
-            // Left Arrow (<)
+            // Left Arrow (<) - Floating Overlay
             Rectangle {
                 id: leftNavBtn
                 width: 28
                 height: 28
                 radius: 14
                 anchors.left: parent.left
-                anchors.leftMargin: 6
+                anchors.leftMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
                 visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
@@ -733,14 +756,14 @@ Item {
                 }
             }
 
-            // Right Arrow (>)
+            // Right Arrow (>) - Floating Overlay
             Rectangle {
                 id: rightNavBtn
                 width: 28
                 height: 28
                 radius: 14
                 anchors.right: parent.right
-                anchors.rightMargin: 6
+                anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
                 visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1

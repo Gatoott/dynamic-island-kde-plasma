@@ -19,12 +19,30 @@ KCM.SimpleKCM {
     property alias cfg_notchStyle: notchStyleSpin.value
     property alias cfg_verticalOffset: verticalOffsetSpin.value
     property alias cfg_horizontalOffset: horizontalOffsetSpin.value
-    property alias cfg_notchCornerRadius: notchCornerRadiusSpin.value
+    property alias cfg_notchCornerRadius: bottomRadiusSpin.value
+    property alias cfg_notchBottomRadius: bottomRadiusSpin.value
+    property alias cfg_notchWingRadius: wingRadiusSpin.value
+    property alias cfg_islandPadding: islandPaddingSpin.value
+    property alias cfg_enableBlur: enableBlurSwitch.checked
 
     QQC2.TextField {
         id: shapeModeHiddenField
         visible: false
         text: "notch"
+    }
+
+    QQC2.SpinBox {
+        id: islandPaddingSpin
+        visible: false
+        from: 0
+        to: 100
+        value: 12
+    }
+
+    QQC2.CheckBox {
+        id: enableBlurSwitch
+        visible: false
+        checked: true
     }
 
     QQC2.SpinBox {
@@ -324,12 +342,25 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Corner Radius Notch Bawah:")
+            Kirigami.FormData.label: i18n("Lekukan Sayap Atas (Top Wing Radius):")
             spacing: 8
             QQC2.SpinBox {
-                id: notchCornerRadiusSpin
-                from: 4
-                to: 32
+                id: wingRadiusSpin
+                from: 0
+                to: 28
+                stepSize: 1
+                editable: true
+            }
+            QQC2.Label { text: "px" }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Sudut Bawah Notch (Bottom Corner Radius):")
+            spacing: 8
+            QQC2.SpinBox {
+                id: bottomRadiusSpin
+                from: 0
+                to: 28
                 stepSize: 1
                 editable: true
             }
