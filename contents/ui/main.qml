@@ -26,10 +26,29 @@ PlasmoidItem {
     readonly property int cfgExpandedHeight: Plasmoid.configuration.expandedHeight || 335
     readonly property int cfgBorderRadius: Plasmoid.configuration.borderRadius || 18
     readonly property int cfgNotchCornerRadius: Plasmoid.configuration.notchCornerRadius || 18
-    readonly property int cfgVerticalOffset: Plasmoid.configuration.verticalOffset !== undefined ? Plasmoid.configuration.verticalOffset : 0
     readonly property int cfgHorizontalOffset: Plasmoid.configuration.horizontalOffset !== undefined ? Plasmoid.configuration.horizontalOffset : 0
     readonly property int cfgClockFontSize: Plasmoid.configuration.clockFontSize || 13
     readonly property string cfgIslandShapeMode: Plasmoid.configuration.islandShapeMode || "notch"
+    readonly property int cfgNotchStyle: {
+        if (Plasmoid.configuration.notchStyle !== undefined) {
+            return Plasmoid.configuration.notchStyle;
+        }
+        var s = Plasmoid.configuration.islandShapeMode;
+        if (s === "pill" || s === "dock" || s === "circle") return 1;
+        return 0;
+    }
+    readonly property bool isFloatingStyle: cfgNotchStyle === 1 || cfgIslandShapeMode === "dock" || cfgIslandShapeMode === "pill" || cfgIslandShapeMode === "circle"
+
+    // Ambil nilai dari konfigurasi (default 10 jika mode floating, default 0 jika living notch)
+    readonly property int cfgVerticalOffset: {
+        if (Plasmoid.configuration.verticalOffset !== undefined) {
+            return Plasmoid.configuration.verticalOffset;
+        }
+        return root.isFloatingStyle ? 10 : 0;
+    }
+
+    // Gunakan nilai konfigurasi secara langsung tanpa batasan buatan:
+    readonly property int effectiveVerticalOffset: root.cfgVerticalOffset
     readonly property bool cfgExpandOnHover: Plasmoid.configuration.expandOnHover || false
     readonly property bool cfgShowVisualizer: Plasmoid.configuration.showVisualizer !== undefined ? Plasmoid.configuration.showVisualizer : true
     readonly property int cfgNotificationDuration: Plasmoid.configuration.notificationDuration || 4000
@@ -109,12 +128,12 @@ PlasmoidItem {
     }
 
     preferredRepresentation: compactRepresentation
-    Layout.preferredWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + 32)
-    Layout.preferredHeight: (!root.inPanel) ? desktopLivingNotch.height : root.cfgCompactHeight
+    Layout.preferredWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + (root.isFloatingStyle ? 0 : 32))
+    Layout.preferredHeight: (!root.inPanel) ? desktopLivingNotch.height : (root.cfgCompactHeight + (root.isFloatingStyle && root.effectiveVerticalOffset > 0 ? root.effectiveVerticalOffset : 0))
     Layout.minimumWidth: 100
-    Layout.maximumHeight: root.inPanel ? root.cfgCompactHeight : 10000
-    implicitWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + 32)
-    implicitHeight: (!root.inPanel) ? desktopLivingNotch.height : root.cfgCompactHeight
+    Layout.maximumHeight: root.inPanel ? (root.cfgCompactHeight + (root.isFloatingStyle && root.effectiveVerticalOffset > 0 ? root.effectiveVerticalOffset : 0)) : 10000
+    implicitWidth: (!root.inPanel) ? desktopLivingNotch.width : (root.currentCompactWidth + (root.isFloatingStyle ? 0 : 32))
+    implicitHeight: (!root.inPanel) ? desktopLivingNotch.height : (root.cfgCompactHeight + (root.isFloatingStyle && root.effectiveVerticalOffset > 0 ? root.effectiveVerticalOffset : 0))
 
     TextMetrics {
         id: pillLyricsMetrics
@@ -855,7 +874,7 @@ PlasmoidItem {
         height: root.cfgCompactHeight
 
         anchors.top: parent.top
-        anchors.topMargin: root.cfgVerticalOffset
+        anchors.topMargin: root.effectiveVerticalOffset
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
@@ -871,6 +890,8 @@ PlasmoidItem {
             notchH: root.cfgCompactHeight
             wingR: 14
             cornerR: 18
+            notchStyle: root.cfgNotchStyle
+            islandShapeMode: root.cfgIslandShapeMode
 
             cfgAccentColor: root.cfgAccentColor
             cfgBgColor: root.cfgBgColor
@@ -916,7 +937,7 @@ PlasmoidItem {
         height: 480
         // Lepaskan ikatan visualParent: atur koordinat absolut terhadap layar (menempel di tengah atas)
         x: Math.round((Screen.desktopAvailableWidth - width) / 2) + root.cfgHorizontalOffset
-        y: root.cfgVerticalOffset
+        y: root.effectiveVerticalOffset
         type: PlasmaCore.Dialog.Normal
         flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.BypassWindowManagerHint | Qt.NoDropShadowWindowHint
         backgroundHints: PlasmaCore.Types.NoBackground
@@ -954,6 +975,8 @@ PlasmoidItem {
                 compactWidth: root.currentCompactWidth
                 compactHeight: root.cfgCompactHeight
                 isExpanded: root.isExpanded
+                notchStyle: root.cfgNotchStyle
+                islandShapeMode: root.cfgIslandShapeMode
 
                 cfgAccentColor: root.cfgAccentColor
                 cfgBgColor: root.cfgBgColor
@@ -963,7 +986,6 @@ PlasmoidItem {
                 currentExpandedTab: root.currentExpandedTab
                 showLyrics: root.showLyrics
                 currentTimeString: root.currentTimeString
-                islandShapeMode: root.cfgIslandShapeMode
 
                 showControlTab: root.cfgShowControlTab
                 showMediaTab: root.cfgShowMediaTab
@@ -1073,13 +1095,15 @@ PlasmoidItem {
         id: desktopLivingNotch
         visible: !root.inPanel
         anchors.top: parent.top
-        anchors.topMargin: root.cfgVerticalOffset
+        anchors.topMargin: root.effectiveVerticalOffset
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
         compactWidth: root.currentCompactWidth
         compactHeight: root.cfgCompactHeight
         isExpanded: root.isExpanded
+        notchStyle: root.cfgNotchStyle
+        islandShapeMode: root.cfgIslandShapeMode
 
         cfgAccentColor: root.cfgAccentColor
         cfgBgColor: root.cfgBgColor
@@ -1089,7 +1113,6 @@ PlasmoidItem {
         currentExpandedTab: root.currentExpandedTab
         showLyrics: root.showLyrics
         currentTimeString: root.currentTimeString
-        islandShapeMode: root.cfgIslandShapeMode
 
         showControlTab: root.cfgShowControlTab
         showMediaTab: root.cfgShowMediaTab

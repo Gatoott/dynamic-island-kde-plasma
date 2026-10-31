@@ -14,6 +14,12 @@ Item {
     property real wingR: 14     // Radius cekukan sayap
     property real cornerR: 18   // Radius sudut cembung bawah
 
+    // Style & Shape Options
+    property int notchStyle: 0
+    property string islandShapeMode: "notch"
+    readonly property bool isFloatingStyle: notchStyle === 1 || islandShapeMode === "dock" || islandShapeMode === "pill"
+    readonly property real effectiveWingR: isFloatingStyle ? 0 : wingR
+
     property color cfgBgColor: "#0b0b0f"
     property color cfgBorderColor: "#2a2b36"
     property color cfgAccentColor: "#3daee9"
@@ -44,7 +50,7 @@ Item {
 
     signal requestToggle()
 
-    width: notchW + (wingR * 2)
+    width: isFloatingStyle ? notchW : (notchW + (effectiveWingR * 2))
     height: notchH
 
     Behavior on notchW {
@@ -56,10 +62,35 @@ Item {
     }
 
     // ==============================================================
-    // SILUET COMPACT TUNGGAL (PathCubic Inverted Fillet Anti-Gagal)
+    // 1A. SILUET FLOATING CAPSULE (Tanpa Lekukan Sayap Atas)
+    // ==============================================================
+    Rectangle {
+        id: floatingPillBody
+        visible: compactNotchRoot.isFloatingStyle
+        anchors.fill: parent
+        radius: height / 2 // Kapsul membulat penuh sempurna
+        color: compactNotchRoot.cfgBgColor.a > 0 ? compactNotchRoot.cfgBgColor : "#0b0b0f"
+        border.width: 1
+        border.color: compactNotchRoot.cfgBorderColor.a > 0 ? compactNotchRoot.cfgBorderColor : Qt.rgba(1, 1, 1, 0.12)
+        clip: true
+
+        // Inner subtle rim highlight
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Math.max(0, (parent.height / 2) - 1)
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.08)
+        }
+    }
+
+    // ==============================================================
+    // 1B. SILUET LIVING NOTCH (PathCubic Inverted Fillet Sayap Nempel Atas)
     // ==============================================================
     Shape {
         id: compactSilhouette
+        visible: !compactNotchRoot.isFloatingStyle
         anchors.fill: parent
         layer.enabled: true
         layer.samples: 4

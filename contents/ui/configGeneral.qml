@@ -16,6 +16,7 @@ KCM.SimpleKCM {
     property alias cfg_borderRadius: borderRadiusSpin.value
 
     property alias cfg_islandShapeMode: shapeModeHiddenField.text
+    property alias cfg_notchStyle: notchStyleSpin.value
     property alias cfg_verticalOffset: verticalOffsetSpin.value
     property alias cfg_horizontalOffset: horizontalOffsetSpin.value
     property alias cfg_notchCornerRadius: notchCornerRadiusSpin.value
@@ -24,6 +25,19 @@ KCM.SimpleKCM {
         id: shapeModeHiddenField
         visible: false
         text: "notch"
+    }
+
+    QQC2.SpinBox {
+        id: notchStyleSpin
+        visible: false
+        from: 0
+        to: 1
+        value: 0
+        Component.onCompleted: {
+            if (value === 0 && (shapeModeHiddenField.text === "dock" || shapeModeHiddenField.text === "pill" || shapeModeHiddenField.text === "circle")) {
+                value = 1;
+            }
+        }
     }
 
     // Appearance
@@ -219,39 +233,73 @@ KCM.SimpleKCM {
         }
 
         RowLayout {
-            Kirigami.FormData.label: i18n("Mode Tampilan:")
+            Kirigami.FormData.label: i18n("Bentuk & Gaya (Style):")
             spacing: 16
             QQC2.RadioButton {
-                text: i18n("Notch (Nempel Atas)")
-                checked: shapeModeHiddenField.text === "notch"
-                onToggled: if (checked) shapeModeHiddenField.text = "notch"
+                text: i18n("Living Notch (Menempel di Atas)")
+                checked: notchStyleSpin.value === 0
+                onToggled: if (checked) {
+                    notchStyleSpin.value = 0;
+                    shapeModeHiddenField.text = "notch";
+                    if (verticalOffsetSpin.value === 12) {
+                        verticalOffsetSpin.value = 0;
+                    }
+                }
             }
             QQC2.RadioButton {
-                text: i18n("Dock (Mengambang)")
-                checked: shapeModeHiddenField.text === "dock"
-                onToggled: if (checked) shapeModeHiddenField.text = "dock"
+                text: i18n("Floating Capsule (Kapsul Mengambang)")
+                checked: notchStyleSpin.value === 1
+                onToggled: if (checked) {
+                    notchStyleSpin.value = 1;
+                    shapeModeHiddenField.text = "pill";
+                    if (verticalOffsetSpin.value === 0) {
+                        verticalOffsetSpin.value = 12;
+                    }
+                }
             }
         }
 
         RowLayout {
             Kirigami.FormData.label: i18n("Margin Vertikal (Y-Offset):")
-            spacing: 8
+            spacing: 6
             QQC2.SpinBox {
                 id: verticalOffsetSpin
-                from: -150
-                to: 150
+                from: -100
+                to: 100
                 stepSize: 1
                 editable: true
             }
             QQC2.Label { text: "px" }
             QQC2.Button {
-                text: i18n("Nempel Atas (-8px)")
+                text: i18n("Tarik Atas (-8px)")
                 onClicked: verticalOffsetSpin.value = -8
             }
             QQC2.Button {
-                text: i18n("Reset 0px")
+                text: i18n("Rapat (-4px)")
+                onClicked: verticalOffsetSpin.value = -4
+            }
+            QQC2.Button {
+                text: i18n("Reset (0px)")
                 onClicked: verticalOffsetSpin.value = 0
             }
+            QQC2.Button {
+                text: i18n("Rapat (4px)")
+                onClicked: verticalOffsetSpin.value = 4
+            }
+            QQC2.Button {
+                text: i18n("Default (12px)")
+                onClicked: verticalOffsetSpin.value = 12
+            }
+            QQC2.Button {
+                text: i18n("Lega (20px)")
+                onClicked: verticalOffsetSpin.value = 20
+            }
+        }
+
+        QQC2.Label {
+            text: i18n("Nilai negatif (-) menggeser ke atas/merapatkan tepi, nilai positif (+) menurunkan posisi kapsul ke bawah.")
+            font.pixelSize: 11
+            opacity: 0.7
         }
 
         RowLayout {

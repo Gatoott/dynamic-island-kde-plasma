@@ -21,6 +21,7 @@ Item {
     property bool canGoNext: true
 
     property color accentColor: "#3daee9"
+    property bool isFloatingStyle: false
     property string currentTimeString: "00:00"
     property string currentDateString: "Sat 18 Oct"
     property string clockFontFamily: ""
@@ -140,8 +141,8 @@ Item {
     Rectangle {
         id: albumTintBackground
         anchors.fill: parent
-        topLeftRadius: 0
-        topRightRadius: 0
+        topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+        topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
         bottomLeftRadius: 22
         bottomRightRadius: 22
         clip: true
@@ -178,8 +179,8 @@ Item {
                     y: 0
                     width: albumTintBackground.width
                     height: albumTintBackground.height
-                    topLeftRadius: 0
-                    topRightRadius: 0
+                    topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+                    topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
                     bottomLeftRadius: 22
                     bottomRightRadius: 22
                 }

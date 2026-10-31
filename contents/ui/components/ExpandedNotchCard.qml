@@ -15,7 +15,9 @@ Item {
     property int currentExpandedTab: 0
     property bool showLyrics: false
     property string currentTimeString: "00:00"
+    property int notchStyle: 0
     property string islandShapeMode: "notch"
+    readonly property bool isFloatingStyle: notchStyle === 1 || islandShapeMode === "dock" || islandShapeMode === "pill"
 
     // Tab Modular Visibility
     property bool showControlTab: true
@@ -115,6 +117,7 @@ Item {
     property bool isOverlayDialog: false
 
     readonly property real wingRadius: 14
+    readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
     property real cornerRadius: isExpanded ? 22 : 18
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
@@ -162,7 +165,7 @@ Item {
     property real targetW: isExpanded ? getTargetWidthForTab(currentExpandedTab, showLyrics) : compactWidth
     property real targetH: isExpanded ? getTargetHeightForTab(currentExpandedTab, showLyrics) : compactHeight
 
-    width: targetW + (wingRadius * 2)
+    width: isFloatingStyle ? targetW : (targetW + (effectiveWingRadius * 2))
     height: targetH
     opacity: 1.0
 
@@ -228,12 +231,38 @@ Item {
     // 1. SILUET TUNGGAL UTUH (Bodi + Sayap Kiri & Kanan Tanpa Sambungan)
     // Satu ShapePath tertutup: Mustahil ada garis tumpuk atau undakan
     // ==============================================================
+    // 1A. SILUET FLOATING CAPSULE (Tanpa Lekukan Sayap Atas)
     // ==============================================================
-    // 1. SILUET TUNGGAL UTUH (Bodi + Sayap Kiri & Kanan - Gambar 1)
+    Rectangle {
+        id: floatingSilhouette
+        visible: unifiedNotchRoot.isFloatingStyle
+        anchors.fill: parent
+        opacity: unifiedNotchRoot.bodyOpacity
+        radius: unifiedNotchRoot.isExpanded ? unifiedNotchRoot.cornerRadius : (height / 2)
+        Behavior on radius { NumberAnimation { duration: 200 } }
+        color: unifiedNotchRoot.cfgBgColor.a > 0 ? unifiedNotchRoot.cfgBgColor : "#0b0b0f"
+        border.width: 1
+        border.color: unifiedNotchRoot.cfgBorderColor.a > 0 ? unifiedNotchRoot.cfgBorderColor : Qt.rgba(1, 1, 1, 0.12)
+        clip: true
+
+        // Inner subtle rim highlight
+        Rectangle {
+            anchors.fill: parent
+            anchors.margins: 1
+            radius: Math.max(0, parent.radius - 1)
+            color: "transparent"
+            border.width: 1
+            border.color: Qt.rgba(1, 1, 1, 0.08)
+        }
+    }
+
+    // ==============================================================
+    // 1B. SILUET LIVING NOTCH (Bodi + Sayap Kiri & Kanan - Gambar 1)
     // Satu ShapePath tertutup: Mustahil ada garis tumpuk atau undakan
     // ==============================================================
     Shape {
         id: notchSilhouette
+        visible: !unifiedNotchRoot.isFloatingStyle
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
         layer.enabled: true
@@ -376,8 +405,9 @@ Item {
         }
     }
 
-    // --- Subtle Top Glow Edge (Nusa 1.1 Style) ---
+    // --- Subtle Top Glow Edge (Hanya Aktif saat Nempel Atas / Living Notch) ---
     Rectangle {
+        visible: !unifiedNotchRoot.isFloatingStyle
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         width: unifiedNotchRoot.targetW
@@ -568,6 +598,7 @@ Item {
                     id: mediaLyricsComponent
                     MediaLyricsCard {
                         anchors.fill: parent
+                        isFloatingStyle: unifiedNotchRoot.isFloatingStyle
                         trackTitle: unifiedNotchRoot.trackTitle
                         trackArtist: unifiedNotchRoot.trackArtist
                         trackAlbum: unifiedNotchRoot.trackAlbum

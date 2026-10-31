@@ -27,6 +27,9 @@
     <entry name="islandShapeMode" type="String">
       <default>notch</default>
     </entry>
+    <entry name="notchStyle" type="Int">
+      <default>0</default>
+    </entry>
     <entry name="verticalOffset" type="Int">
       <default>0</default>
     </entry>
