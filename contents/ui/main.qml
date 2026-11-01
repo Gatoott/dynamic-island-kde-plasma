@@ -72,6 +72,9 @@ PlasmoidItem {
     readonly property bool cfgLyricsFontBold: Plasmoid.configuration.lyricsFontBold !== undefined ? Plasmoid.configuration.lyricsFontBold : true
     readonly property bool cfgShowCompactVisualizer: Plasmoid.configuration.showCompactVisualizer !== undefined ? Plasmoid.configuration.showCompactVisualizer : false
     readonly property bool cfgAutoRetryLyrics: Plasmoid.configuration.autoRetryLyrics !== undefined ? Plasmoid.configuration.autoRetryLyrics : true
+    readonly property int cfgExpandedBgStyle: Plasmoid.configuration.expandedBgStyle !== undefined ? Plasmoid.configuration.expandedBgStyle : 0
+    readonly property int cfgMediaCardBgMode: Plasmoid.configuration.mediaCardBgMode !== undefined ? Plasmoid.configuration.mediaCardBgMode : 0
+    readonly property int cfgLyricsBgMode: Plasmoid.configuration.lyricsBgMode !== undefined ? Plasmoid.configuration.lyricsBgMode : 1
 
     readonly property color cfgBgColor: {
         var c = Plasmoid.configuration.backgroundColor;
@@ -84,7 +87,7 @@ PlasmoidItem {
 
     // --- Expansion & Morphing State (SINGLE CONTAINER) ---
     property bool isExpanded: false
-    property int currentExpandedTab: 0 // 0 = Control Center, 1 = Media Player & Lyrics, 2 = Clipboard
+    property int currentExpandedTab: 0 // 0 = Media Player, 1 = Notifications, 2 = Control Center
     property int savedPanelHeight: 46
 
     readonly property bool showPillLyrics: root.showLyrics && root.isPlaying
@@ -107,15 +110,32 @@ PlasmoidItem {
 
     TextMetrics {
         id: notifMetrics
-        font.pixelSize: 12
-        font.weight: Font.Bold
+        font.pixelSize: 11
+        font.bold: true
         font.family: "Inter, Roboto, sans-serif"
-        text: root.notifSummary.length > 0 ? root.notifSummary : (root.notifAppName.length > 0 ? root.notifAppName : "Notification")
+        text: {
+            var isWA = (root.notifAppName || "").toLowerCase().indexOf("whatsapp") !== -1 ||
+                       (root.notifSummary || "").toLowerCase().indexOf("whatsapp") !== -1;
+            var sender = (root.notifSummary || "").trim();
+            var msg = (root.notifBody || "").trim();
+            if (isWA && (sender.toLowerCase() === "whatsapp" || sender === "")) {
+                var colonIdx = msg.indexOf(":");
+                if (colonIdx > 0 && colonIdx < 30) {
+                    sender = msg.substring(0, colonIdx).trim();
+                    msg = msg.substring(colonIdx + 1).trim();
+                } else {
+                    sender = "Pesan Baru";
+                }
+            } else if (!isWA && sender === "") {
+                sender = root.notifAppName.length > 0 ? root.notifAppName : "Notification";
+            }
+            return (sender.length >= msg.length) ? sender : msg;
+        }
     }
 
     readonly property int currentCompactWidth: {
         if (root.activeNotificationPill) {
-            return Math.max(220, Math.min(380, notifMetrics.advanceWidth + 64));
+            return Math.max(220, Math.min(360, Math.ceil(notifMetrics.advanceWidth) + 64));
         }
         if (root.activeBatteryPill) return 210;
         if (root.showPillLyrics) {
@@ -135,7 +155,7 @@ PlasmoidItem {
         if (!root.isExpanded) {
             return root.currentCompactWidth;
         }
-        if (root.currentExpandedTab === 1 && root.showLyrics) {
+        if (root.showLyrics) {
             return 640;
         }
         return root.cfgExpandedWidth;
@@ -925,14 +945,24 @@ PlasmoidItem {
         }
     }
 
-    function openNotch() {
+    function openNotch(targetTabIndex) {
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
         if (root.isExpanded) return;
 
+        var wasNotifPill = root.activeNotificationPill;
+
         root.activeNotificationPill = false;
         root.activeBatteryPill = false;
+
+        if (targetTabIndex !== undefined) {
+            root.currentExpandedTab = targetTabIndex;
+        } else if (wasNotifPill) {
+            root.currentExpandedTab = 1; // Direct jump to Notifications tab when opening from notification pill
+        } else {
+            root.currentExpandedTab = 0; // Default: Media Playing (Tab Utama)
+        }
 
         // Posisikan jendela dialog tepat di tengah atas layar:
         expandedDialog.x = Math.round((Screen.width - expandedDialog.width) / 2) + root.cfgHorizontalOffset;
@@ -951,8 +981,8 @@ PlasmoidItem {
         root.isExpanded = true;
     }
 
-    function expandNotch() {
-        openNotch();
+    function expandNotch(targetTabIndex) {
+        openNotch(targetTabIndex);
     }
 
     function collapseNotch() {
@@ -967,9 +997,9 @@ PlasmoidItem {
         closeWatchdogTimer.restart(); // Jalankan timer pengaman anti-deadlock
     }
 
-    function toggleExpanded() {
+    function toggleExpanded(targetTab) {
         if (!root.isExpanded) {
-            openNotch();
+            openNotch(targetTab);
         } else {
             triggerCollapseSequence();
         }
@@ -1094,6 +1124,9 @@ PlasmoidItem {
                 islandShapeMode: root.cfgIslandShapeMode
                 cfgNotchWingRadius: root.cfgNotchWingRadius
                 cfgNotchBottomRadius: root.cfgNotchBottomRadius
+                expandedBgStyle: root.cfgExpandedBgStyle
+                mediaCardBgMode: root.cfgMediaCardBgMode
+                lyricsBgMode: root.cfgLyricsBgMode
 
                 cfgAccentColor: root.cfgAccentColor
                 cfgBgColor: root.cfgBgColor
@@ -1225,6 +1258,9 @@ PlasmoidItem {
         islandShapeMode: root.cfgIslandShapeMode
         cfgNotchWingRadius: root.cfgNotchWingRadius
         cfgNotchBottomRadius: root.cfgNotchBottomRadius
+        expandedBgStyle: root.cfgExpandedBgStyle
+        mediaCardBgMode: root.cfgMediaCardBgMode
+        lyricsBgMode: root.cfgLyricsBgMode
 
         cfgAccentColor: root.cfgAccentColor
         cfgBgColor: root.cfgBgColor

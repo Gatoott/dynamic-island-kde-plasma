@@ -24,6 +24,9 @@ KCM.SimpleKCM {
     property alias cfg_notchWingRadius: wingRadiusSpin.value
     property alias cfg_islandPadding: islandPaddingSpin.value
     property alias cfg_enableBlur: enableBlurSwitch.checked
+    property alias cfg_expandedBgStyle: expandedBgStyleCombo.currentIndex
+    property alias cfg_mediaCardBgMode: mediaCardBgModeCombo.currentIndex
+    property alias cfg_lyricsBgMode: lyricsBgModeCombo.currentIndex
 
     QQC2.TextField {
         id: shapeModeHiddenField
@@ -482,6 +485,46 @@ KCM.SimpleKCM {
             QQC2.Button {
                 text: i18n("Pilih...")
                 onClicked: accentColDialog.open()
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Latar Belakang Notch Expanded:")
+            spacing: 8
+            QQC2.ComboBox {
+                id: expandedBgStyleCombo
+                model: [
+                    i18n("Solid Deep Black (Default)"),
+                    i18n("Glassy Frosted Blur (macOS Style)")
+                ]
+                Layout.preferredWidth: 260
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Latar Belakang Media Player:")
+            spacing: 8
+            QQC2.ComboBox {
+                id: mediaCardBgModeCombo
+                model: [
+                    i18n("Warna Adaptif Album Cover (Adaptive Tint)"),
+                    i18n("Glassy Acrylic Blur (macOS Style)"),
+                    i18n("Hitam Pekat Minimalis / Pure Dark")
+                ]
+                Layout.preferredWidth: 260
+            }
+        }
+
+        RowLayout {
+            Kirigami.FormData.label: i18n("Latar Belakang Mode Lirik:")
+            spacing: 8
+            QQC2.ComboBox {
+                id: lyricsBgModeCombo
+                model: [
+                    i18n("Hitam Pekat Minimalis / Pure Dark"),
+                    i18n("Gradasi Rona Album (Bottom Album Tint)")
+                ]
+                Layout.preferredWidth: 260
             }
         }
 

@@ -32,14 +32,14 @@ Item {
 
     readonly property var availableTabs: {
         var tabs = [];
-        if (showControlTab) tabs.push("control");
         if (showMediaTab) tabs.push("media");
-        if (showClipboardTab) tabs.push("clipboard");
         if (showNotificationTab) tabs.push("notification");
-        if (tabs.length === 0) tabs.push("control");
+        if (showControlTab) tabs.push("control");
+        if (showClipboardTab) tabs.push("clipboard");
+        if (tabs.length === 0) tabs.push("media");
         return tabs;
     }
-    readonly property string activeTabKey: (availableTabs && availableTabs.length > 0) ? availableTabs[currentExpandedTab % availableTabs.length] : "control"
+    readonly property string activeTabKey: (availableTabs && availableTabs.length > 0) ? availableTabs[currentExpandedTab % availableTabs.length] : "media"
 
     // Typography Options
     property string cfgClockFontFamily: ""
@@ -52,6 +52,36 @@ Item {
     property color cfgAccentColor: "#3daee9"
     property color cfgBgColor: Qt.rgba(0.05, 0.06, 0.07, 0.95)
     property color cfgBorderColor: Qt.rgba(1, 1, 1, 0.2)
+    property int expandedBgStyle: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.expandedBgStyle !== undefined) return plasmoid.configuration.expandedBgStyle;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.expandedBgStyle !== undefined) return Plasmoid.configuration.expandedBgStyle;
+        return 0;
+    }
+    property int mediaCardBgMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
+        return 0;
+    }
+    property int lyricsBgMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.lyricsBgMode !== undefined) return plasmoid.configuration.lyricsBgMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.lyricsBgMode !== undefined) return Plasmoid.configuration.lyricsBgMode;
+        return 1;
+    }
+
+    readonly property color effectiveBgColor: {
+        if (expandedBgStyle === 1) {
+            return Qt.rgba(0.06, 0.06, 0.08, 0.72);
+        }
+        return cfgBgColor.a > 0 ? cfgBgColor : "#09090b";
+    }
+
+    readonly property color effectiveBorderColor: {
+        if (expandedBgStyle === 1) {
+            return Qt.rgba(1, 1, 1, 0.15);
+        }
+        return cfgBorderColor.a > 0 ? cfgBorderColor : Qt.rgba(1, 1, 1, 0.12);
+    }
+
     property int cfgExpandedWidth: 420
     property int cfgExpandedHeight: 335
     property int compactWidth: 180
@@ -137,49 +167,24 @@ Item {
     property real cornerRadius: cfgNotchBottomRadius
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
+    // Tetapkan satu nilai tinggi tetap yang dipakai bersama di semua tab (Uniform Height):
+    readonly property real standardCardHeight: 180
+
     // Pemetaan Dimensi Eksplisit Tiap Tab (Anti-NaN & Anti-Squish)
-    // Tab 0: Control Center (Landscape Dashboard) -> 520 x 380
-    // Tab 1: Media Player (Landscape Card)        -> 540 x 210
-    // Tab 2: Synced Lyrics (Landscape Split)      -> 620 x 220
-    // Tab 3: Clipboard Manager                    -> 480 x 360
-    // Tab 4: Notification History                 -> 480 x 360
     function getTargetWidthForTab(tabIndex, lyricsActive) {
-        var key = activeTabKey;
-        if (key === "media" || tabIndex === 1) {
-            return lyricsActive ? 640 : 540;
+        if (activeTabKey === "media" && lyricsActive) {
+            return 640;
         }
-        if (key === "control" || tabIndex === 0) {
-            return 520;
-        }
-        if (key === "clipboard" || tabIndex === 2) {
-            return 480;
-        }
-        if (key === "notification" || tabIndex === 3) {
-            return 480;
-        }
-        return 520;
+        return 500;
     }
 
     function getTargetHeightForTab(tabIndex, lyricsActive) {
-        var key = activeTabKey;
-        if (key === "media" || tabIndex === 1) {
-            return lyricsActive ? 220 : 210;
-        }
-        if (key === "control" || tabIndex === 0) {
-            return 380;
-        }
-        if (key === "clipboard" || tabIndex === 2) {
-            return 360;
-        }
-        if (key === "notification" || tabIndex === 3) {
-            return 360;
-        }
-        return 360;
+        return standardCardHeight;
     }
 
-    // Ikat targetW dan targetH secara langsung dan reaktif:
+    // Ikat targetW dan targetH secara langsung dan reaktif (Kunci targetH agar selalu sama):
     property real targetW: isExpanded ? getTargetWidthForTab(currentExpandedTab, showLyrics) : compactWidth
-    property real targetH: isExpanded ? getTargetHeightForTab(currentExpandedTab, showLyrics) : compactHeight
+    property real targetH: isExpanded ? standardCardHeight : compactHeight
 
     width: isFloatingStyle ? targetW : (targetW + (effectiveWingRadius * 2))
     height: targetH
@@ -263,20 +268,9 @@ Item {
         opacity: unifiedNotchRoot.bodyOpacity
         radius: unifiedNotchRoot.isExpanded ? unifiedNotchRoot.cornerRadius : (height / 2)
         Behavior on radius { NumberAnimation { duration: 200 } }
-        color: unifiedNotchRoot.cfgBgColor.a > 0 ? unifiedNotchRoot.cfgBgColor : "#0b0b0f"
-        border.width: 1
-        border.color: unifiedNotchRoot.cfgBorderColor.a > 0 ? unifiedNotchRoot.cfgBorderColor : Qt.rgba(1, 1, 1, 0.12)
+        color: unifiedNotchRoot.effectiveBgColor
+        border.width: 0
         clip: true
-
-        // Inner subtle rim highlight
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Math.max(0, parent.radius - 1)
-            color: "transparent"
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.08)
-        }
     }
 
     // ==============================================================
@@ -291,77 +285,11 @@ Item {
         layer.enabled: true
         layer.samples: 4
 
-        // 1A. Aksen Dark Glow Minimalis Mengitari Siluet (seperti Gambar 1)
+        // Siluet Tunggal Bodi Notch (Tanpa border samping & bawah)
         ShapePath {
-            strokeColor: Qt.rgba(0.2, 0.45, 0.85, 0.28)
-            strokeWidth: 3
-            fillColor: "transparent"
-
-            startX: 0
-            startY: 0
-
-            // 1. Lekukan CEKUNG sayap kiri (Inverted Fillet) menggunakan PathCubic
-            PathCubic {
-                x: unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.wingRadius
-                control1X: unifiedNotchRoot.wingRadius * 0.55
-                control1Y: 0
-                control2X: unifiedNotchRoot.wingRadius
-                control2Y: unifiedNotchRoot.wingRadius * 0.45
-            }
-
-            // 2. Dinding vertikal kiri turun ke bawah
-            PathLine {
-                x: unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
-            }
-
-            // 3. Sudut cembung kiri bawah
-            PathArc {
-                x: unifiedNotchRoot.wingRadius + unifiedNotchRoot.cornerRadius
-                y: unifiedNotchRoot.targetH
-                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
-                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
-                direction: PathArc.Counterclockwise
-            }
-
-            // 4. Garis horizontal dasar notch
-            PathLine {
-                x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius - unifiedNotchRoot.cornerRadius
-                y: unifiedNotchRoot.targetH
-            }
-
-            // 5. Sudut cembung kanan bawah
-            PathArc {
-                x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
-                radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
-                radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
-                direction: PathArc.Counterclockwise
-            }
-
-            // 6. Dinding vertikal kanan naik ke atas
-            PathLine {
-                x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.wingRadius
-            }
-
-            // 7. Lekukan CEKUNG sayap kanan keluar menuju garis atas
-            PathCubic {
-                x: unifiedNotchRoot.width
-                y: 0
-                control1X: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
-                control1Y: unifiedNotchRoot.wingRadius * 0.45
-                control2X: unifiedNotchRoot.width - (unifiedNotchRoot.wingRadius * 0.55)
-                control2Y: 0
-            }
-        }
-
-        // 1B. Siluet Tunggal Bodi + 1px Outline Semi-Transparan (Gambar 1 Blueprint)
-        ShapePath {
-            strokeColor: unifiedNotchRoot.cfgBorderColor.a > 0 ? unifiedNotchRoot.cfgBorderColor : "#2a2b36"
-            strokeWidth: 1
-            fillColor: unifiedNotchRoot.cfgBgColor.a > 0 ? unifiedNotchRoot.cfgBgColor : "#0b0b0f"
+            strokeColor: "transparent"
+            strokeWidth: 0
+            fillColor: unifiedNotchRoot.effectiveBgColor
 
             // Mulai dari sayap lekukan kiri atas
             startX: 0
@@ -425,24 +353,6 @@ Item {
 
             // 8. Tutup garis atas
             PathLine { x: 0; y: 0 }
-        }
-    }
-
-    // --- Subtle Top Glow Edge (Hanya Aktif saat Nempel Atas / Living Notch) ---
-    Rectangle {
-        visible: !unifiedNotchRoot.isFloatingStyle
-        anchors.top: parent.top
-        anchors.horizontalCenter: parent.horizontalCenter
-        width: unifiedNotchRoot.targetW
-        height: 2
-        opacity: unifiedNotchRoot.bodyOpacity * 0.8
-        gradient: Gradient {
-            orientation: Gradient.Horizontal
-            GradientStop { position: 0.0; color: Qt.rgba(0.2, 0.4, 0.9, 0.0) }
-            GradientStop { position: 0.3; color: Qt.rgba(0.4, 0.45, 1.0, 0.5) }
-            GradientStop { position: 0.5; color: Qt.rgba(0.55, 0.4, 1.0, 0.65) }
-            GradientStop { position: 0.7; color: Qt.rgba(0.4, 0.45, 1.0, 0.5) }
-            GradientStop { position: 1.0; color: Qt.rgba(0.2, 0.4, 0.9, 0.0) }
         }
     }
 
@@ -582,11 +492,11 @@ Item {
                     sourceComponent: {
                         if (!unifiedNotchRoot.isExpanded) return null;
                         switch (unifiedNotchRoot.activeTabKey) {
-                            case "control": return controlCenterComponent;
                             case "media": return mediaLyricsComponent;
-                            case "clipboard": return clipboardComponent;
                             case "notification": return notificationHistoryComponent;
-                            default: return controlCenterComponent;
+                            case "control": return controlCenterComponent;
+                            case "clipboard": return clipboardComponent;
+                            default: return mediaLyricsComponent;
                         }
                     }
                 }
@@ -622,6 +532,9 @@ Item {
                     MediaLyricsCard {
                         anchors.fill: parent
                         isFloatingStyle: unifiedNotchRoot.isFloatingStyle
+                        expandedBgStyle: unifiedNotchRoot.expandedBgStyle
+                        mediaCardBgMode: unifiedNotchRoot.mediaCardBgMode
+                        lyricsBgMode: unifiedNotchRoot.lyricsBgMode
                         trackTitle: unifiedNotchRoot.trackTitle
                         trackArtist: unifiedNotchRoot.trackArtist
                         trackAlbum: unifiedNotchRoot.trackAlbum
@@ -684,17 +597,17 @@ Item {
             Item {
                 id: navDotsBar
                 anchors.bottom: parent.bottom
-                anchors.bottomMargin: 4
+                anchors.bottomMargin: 8
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: parent.width
-                height: 24
+                height: 20
                 z: 10
 
                 // Pagination Dots
                 Row {
                     id: paginationDotsRow
                     anchors.centerIn: parent
-                    visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
+                    visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !unifiedNotchRoot.showLyrics
                     spacing: 7
 
                     Repeater {
@@ -726,7 +639,7 @@ Item {
                 height: 28
                 radius: 14
                 anchors.left: parent.left
-                anchors.leftMargin: 10
+                anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
                 visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
@@ -734,12 +647,13 @@ Item {
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
 
-                Kirigami.Icon {
+                SFSymbolIcon {
                     anchors.centerIn: parent
                     width: 14
                     height: 14
-                    source: "go-previous"
-                    color: "#ffffff"
+                    name: "chevron.left"
+                    strokeWidth: 1.8
+                    color: leftNavMa.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.75)
                 }
 
                 MouseArea {
@@ -763,7 +677,7 @@ Item {
                 height: 28
                 radius: 14
                 anchors.right: parent.right
-                anchors.rightMargin: 10
+                anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
                 visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
@@ -771,12 +685,13 @@ Item {
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
 
-                Kirigami.Icon {
+                SFSymbolIcon {
                     anchors.centerIn: parent
                     width: 14
                     height: 14
-                    source: "go-next"
-                    color: "#ffffff"
+                    name: "chevron.right"
+                    strokeWidth: 1.8
+                    color: rightNavMa.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.75)
                 }
 
                 MouseArea {

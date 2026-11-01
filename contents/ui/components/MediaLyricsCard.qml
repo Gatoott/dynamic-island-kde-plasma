@@ -26,6 +26,22 @@ Item {
     property string currentDateString: "Sat 18 Oct"
     property string clockFontFamily: ""
 
+    property int mediaCardBgMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
+        return 0;
+    }
+    property int expandedBgStyle: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.expandedBgStyle !== undefined) return plasmoid.configuration.expandedBgStyle;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.expandedBgStyle !== undefined) return Plasmoid.configuration.expandedBgStyle;
+        return 0;
+    }
+    property int lyricsBgMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.lyricsBgMode !== undefined) return plasmoid.configuration.lyricsBgMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.lyricsBgMode !== undefined) return Plasmoid.configuration.lyricsBgMode;
+        return 1;
+    }
+
     property bool showLyrics: false
     property var lyricsList: []
     property int currentLyricIndex: -1
@@ -137,37 +153,56 @@ Item {
         }
     }
 
-    // --- Rounded Adaptive Background ("Lyrics in your album's colors") ---
+    // --- 1. LAYER BACKGROUND MULTI-MODE ---
     Rectangle {
-        id: albumTintBackground
+        id: mediaCardBackground
         anchors.fill: parent
         topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
         topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
         bottomLeftRadius: 22
         bottomRightRadius: 22
         clip: true
-        color: "#0a0c10"
 
+        // Mode 0: Adaptive Album Tint (base color #0a0c10 layered with dynamic gradient below)
+        // Mode 1: Glassy Translucent (Qt.rgba(0.08, 0.08, 0.12, 0.65))
+        // Mode 2: Pure Pitch Dark (#09090b)
+        color: {
+            if (mediaCardRoot.showLyrics) {
+                return "#09090b";
+            }
+            if (mediaCardRoot.mediaCardBgMode === 1) {
+                return Qt.rgba(0.08, 0.08, 0.12, 0.65);
+            } else if (mediaCardRoot.mediaCardBgMode === 2) {
+                return "#09090b";
+            } else {
+                return "#0a0c10";
+            }
+        }
+
+        // Inner border highlight untuk efek glassy kaca (ditiadakan agar sisi samping & bawah bersih)
+        border.width: 0
+
+        // Mode 0 Media Player: Rona Adaptif Gradien dari Album Cover
         Shape {
             anchors.fill: parent
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0
             layer.enabled: true
             layer.samples: 4
-            opacity: mediaCardRoot.showLyrics ? 0.92 : 0.70
-            Behavior on opacity { NumberAnimation { duration: 250 } }
+            opacity: 0.75
 
             ShapePath {
                 strokeWidth: 0
                 fillGradient: RadialGradient {
-                    centerX: mediaCardRoot.width * 0.25
-                    centerY: mediaCardRoot.height * 0.5
-                    centerRadius: mediaCardRoot.width * 0.75
+                    centerX: mediaCardBackground.width * 0.25
+                    centerY: mediaCardBackground.height * 0.5
+                    centerRadius: mediaCardBackground.width * 0.75
                     GradientStop {
                         position: 0.0
-                        color: Qt.rgba(mediaCardRoot.albumDominantColor.r, mediaCardRoot.albumDominantColor.g, mediaCardRoot.albumDominantColor.b, 0.45)
+                        color: Qt.rgba(mediaCardRoot.albumDominantColor.r, mediaCardRoot.albumDominantColor.g, mediaCardRoot.albumDominantColor.b, 0.48)
                     }
                     GradientStop {
                         position: 0.65
-                        color: Qt.rgba(mediaCardRoot.albumDominantColor.r * 0.25, mediaCardRoot.albumDominantColor.g * 0.25, mediaCardRoot.albumDominantColor.b * 0.25, 0.12)
+                        color: Qt.rgba(mediaCardRoot.albumDominantColor.r * 0.25, mediaCardRoot.albumDominantColor.g * 0.25, mediaCardRoot.albumDominantColor.b * 0.25, 0.14)
                     }
                     GradientStop {
                         position: 1.0
@@ -177,8 +212,8 @@ Item {
                 PathRectangle {
                     x: 0
                     y: 0
-                    width: albumTintBackground.width
-                    height: albumTintBackground.height
+                    width: mediaCardBackground.width
+                    height: mediaCardBackground.height
                     topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
                     topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
                     bottomLeftRadius: 22
@@ -186,111 +221,52 @@ Item {
                 }
             }
         }
-    }
 
-    // --------------------------------------------------------------
-    // 1. CENTERED NOTCH-STYLE CLOCK HEADER (Shared across both modes)
-    // --------------------------------------------------------------
-    Item {
-        id: headerClockContainer
-        anchors.top: parent.top
-        anchors.topMargin: 10
-        anchors.horizontalCenter: parent.horizontalCenter
-        height: headerClockColumn.implicitHeight
-        z: 5
-
-        Column {
-            id: headerClockColumn
-            anchors.centerIn: parent
-            spacing: 1
-
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 6
-
-                // Status dot hijau saat playing
-                Rectangle {
-                    width: 6
-                    height: 6
-                    radius: 3
-                    color: "#22c55e"
-                    anchors.verticalCenter: parent.verticalCenter
-                    visible: mediaCardRoot.isPlaying
-                }
-
-                // Teks Jam Utama: Ukuran lebih besar & bold ala Notch
-                Text {
-                    id: headerClockText
-                    text: mediaCardRoot.currentTimeString !== "" ? mediaCardRoot.currentTimeString : "00:00"
-                    color: "#ffffff"
-                    font.pixelSize: 16
-                    font.bold: true
-                    font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-
-            // Teks Tanggal di bawah jam
-            Text {
-                id: headerDateText
-                text: mediaCardRoot.currentDateString !== "" ? mediaCardRoot.currentDateString : ""
-                color: Qt.rgba(1, 1, 1, 0.65)
-                font.pixelSize: 10
-                font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
-                anchors.horizontalCenter: parent.horizontalCenter
-                visible: text !== ""
+        // Mode Lirik: Gradasi Rona Album di Bawah (Aktif jika showLyrics && lyricsBgMode === 1)
+        Rectangle {
+            anchors.fill: parent
+            visible: mediaCardRoot.showLyrics && mediaCardRoot.lyricsBgMode === 1
+            topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            bottomLeftRadius: 22
+            bottomRightRadius: 22
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.35; color: "transparent" }
+                GradientStop { position: 1.0; color: Qt.rgba(mediaCardRoot.albumDominantColor.r, mediaCardRoot.albumDominantColor.g, mediaCardRoot.albumDominantColor.b, 0.45) }
             }
         }
     }
 
-    // Audio Visualizer on the right in Mode A
-    AudioVisualizer {
-        id: modeAVisualizer
-        anchors.right: parent.right
-        anchors.rightMargin: 20
-        anchors.verticalCenter: headerClockContainer.verticalCenter
-        visible: !mediaCardRoot.showLyrics
-        isPlaying: mediaCardRoot.isPlaying
-        barColor: mediaCardRoot.accentColor
-        barCount: 4
-        barWidth: 2
-        spacing: 2
-        maxHeight: 10
-        z: 5
-    }
-
     // ==============================================================
-    // MODE A: STANDARD MEDIA PLAYER (Landscape Card 540x210 - Gambar 4)
+    // MODE A: CANOPY / MACOS ISLAND MEDIA PLAYER
     // ==============================================================
     Item {
         id: standardMediaView
-        anchors.top: headerClockContainer.bottom
-        anchors.topMargin: 4
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
-        anchors.left: parent.left
-        anchors.leftMargin: 44   // Internal padding agar kontrol/artwork tidak tertabrak tombol panah melayang
-        anchors.right: parent.right
-        anchors.rightMargin: 44  // Internal padding agar slider volume tidak tertabrak tombol panah melayang
+        anchors.fill: parent
+        anchors.topMargin: 12
+        anchors.bottomMargin: 24
+        anchors.leftMargin: 46
+        anchors.rightMargin: 46
         visible: !mediaCardRoot.showLyrics
 
         ColumnLayout {
             anchors.fill: parent
-            spacing: 8
+            spacing: 6
 
-            // 1. Middle Row: Album Art + Track Title & Artist (Gambar 4)
+            // A. Baris Atas: Album Art + Detail Lagu + Visualizer Wave
             RowLayout {
                 Layout.fillWidth: true
-                spacing: 12
+                spacing: 10
 
-                // Left: Album Art (Rounded square)
+                // Cover Album Rounded (46x46, radius: 10)
                 Rectangle {
-                    width: 52
-                    height: 52
-                    radius: 12
+                    Layout.preferredWidth: 46
+                    Layout.preferredHeight: 46
+                    radius: 10
                     color: Qt.rgba(1, 1, 1, 0.08)
                     border.width: 1
-                    border.color: Qt.rgba(1, 1, 1, 0.14)
+                    border.color: Qt.rgba(1, 1, 1, 0.12)
                     clip: true
 
                     Image {
@@ -314,72 +290,103 @@ Item {
                     }
                 }
 
-                // Right of Album Art: Title + Artist/Album
+                // Teks Lagu, Badge & Artis
                 ColumnLayout {
                     Layout.fillWidth: true
-                    spacing: 2
+                    spacing: 3
 
-                    // Track Title (Bold)
-                    Text {
-                        text: mediaCardRoot.trackTitle !== "" ? mediaCardRoot.trackTitle : i18n("No Media Playing")
-                        font.pixelSize: 15
-                        font.weight: Font.Bold
-                        font.family: "Inter, Roboto, sans-serif"
-                        color: "#ffffff"
-                        elide: Text.ElideRight
+                    RowLayout {
+                        spacing: 6
                         Layout.fillWidth: true
+
+                        Text {
+                            text: mediaCardRoot.trackTitle !== "" ? mediaCardRoot.trackTitle : i18n("No Media Playing")
+                            color: "#ffffff"
+                            font.pixelSize: 14
+                            font.bold: true
+                            font.family: "Inter, Roboto, sans-serif"
+                            elide: Text.ElideRight
+                            Layout.fillWidth: true
+                        }
+
+                        // Badge "E" (Explicit) ala Canopy / Spotify
+                        Rectangle {
+                            width: 14
+                            height: 14
+                            radius: 3
+                            color: Qt.rgba(1, 1, 1, 0.22)
+                            visible: mediaCardRoot.trackTitle !== ""
+                            Layout.alignment: Qt.AlignVCenter
+
+                            Text {
+                                anchors.centerIn: parent
+                                text: "E"
+                                color: "#ffffff"
+                                font.pixelSize: 8
+                                font.bold: true
+                                font.family: "Inter, Roboto, sans-serif"
+                            }
+                        }
                     }
 
-                    // Artist & Album
                     Text {
                         text: {
                             var a = mediaCardRoot.trackArtist !== "" ? mediaCardRoot.trackArtist : i18n("Play music from Spotify or browser");
-                            if (mediaCardRoot.trackAlbum !== "") a += " - " + mediaCardRoot.trackAlbum;
+                            if (mediaCardRoot.trackAlbum !== "" && mediaCardRoot.trackAlbum !== mediaCardRoot.trackTitle) {
+                                a += " • " + mediaCardRoot.trackAlbum;
+                            }
                             return a;
                         }
-                        font.pixelSize: 11
+                        color: Qt.rgba(1, 1, 1, 0.65)
+                        font.pixelSize: 12
                         font.family: "Inter, Roboto, sans-serif"
-                        color: "#9aa0a6"
                         elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
                 }
+
+                // Audio Visualizer Wave Mini di Kanan
+                AudioVisualizer {
+                    id: canopyVisualizer
+                    Layout.preferredWidth: 28
+                    Layout.preferredHeight: 18
+                    Layout.alignment: Qt.AlignVCenter
+                    isPlaying: mediaCardRoot.isPlaying
+                    barColor: "#ffffff"
+                    barCount: 4
+                    barWidth: 2.5
+                    spacing: 2.5
+                    maxHeight: 16
+                }
             }
 
-            // 2. Full-Width Timeline Progress Slider Row (Gambar 4: 2:59 [-------] -1:17)
-            RowLayout {
+            // B. Baris Tengah: Full Width Progress Bar & Durasi
+            ColumnLayout {
                 Layout.fillWidth: true
-                spacing: 8
+                spacing: 2
 
-                Text {
-                    text: mediaCardRoot.formatTime(mediaCardRoot.trackPosition)
-                    font.pixelSize: 10
-                    font.weight: Font.DemiBold
-                    font.family: "Inter, Roboto, sans-serif"
-                    color: "#9aa0a6"
-                }
-
+                // Slider / Progress Track
                 Item {
                     id: mainProgressBarItem
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 12
+                    Layout.preferredHeight: 10
 
                     Rectangle {
                         id: mainProgressTrack
                         anchors.left: parent.left
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        height: 4
-                        radius: 2
-                        color: Qt.rgba(1, 1, 1, 0.2)
+                        height: 3
+                        radius: 1.5
+                        color: Qt.rgba(1, 1, 1, 0.20)
 
                         Rectangle {
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
                             width: mediaCardRoot.trackLength > 0 ?
-                                       Math.max(4, mainProgressTrack.width * (mediaCardRoot.trackPosition / mediaCardRoot.trackLength)) : 0
-                            radius: 2
+                                       Math.max(3, mainProgressTrack.width * (mediaCardRoot.trackPosition / mediaCardRoot.trackLength)) : 0
+                            radius: 1.5
                             color: "#ffffff"
                         }
                     }
@@ -403,139 +410,40 @@ Item {
                     }
                 }
 
-                Text {
-                    text: mediaCardRoot.formatRemaining(mediaCardRoot.trackPosition, mediaCardRoot.trackLength)
-                    font.pixelSize: 10
-                    font.weight: Font.DemiBold
-                    font.family: "Inter, Roboto, sans-serif"
-                    color: "#9aa0a6"
+                // Waktu Berjalan vs Sisa Durasi
+                RowLayout {
+                    Layout.fillWidth: true
+
+                    Text {
+                        text: mediaCardRoot.formatTime(mediaCardRoot.trackPosition)
+                        color: Qt.rgba(1, 1, 1, 0.55)
+                        font.pixelSize: 10
+                        font.family: "Inter, Roboto, sans-serif"
+                    }
+
+                    Item { Layout.fillWidth: true }
+
+                    Text {
+                        text: mediaCardRoot.formatRemaining(mediaCardRoot.trackPosition, mediaCardRoot.trackLength)
+                        color: Qt.rgba(1, 1, 1, 0.55)
+                        font.pixelSize: 10
+                        font.family: "Inter, Roboto, sans-serif"
+                    }
                 }
             }
 
-            // 3. Transport Controls Bar (Gambar 4)
-            RowLayout {
+            // C. Baris Bawah: Tombol Kontrol Media Terpusat
+            Item {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 44
-                spacing: 8
+                Layout.preferredHeight: 38
 
-                // Lyrics Button (Left side: bubble dialog icon - Two-way toggle)
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: mediaCardRoot.showLyrics ? "#ffffff" : (lyricsToggleMa.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.08))
-                    border.width: 1
-                    border.color: mediaCardRoot.showLyrics ? "#ffffff" : Qt.rgba(1, 1, 1, 0.1)
-
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        width: 16
-                        height: 16
-                        source: "dialog-messages"
-                        color: mediaCardRoot.showLyrics ? "#111418" : "#ffffff"
-                    }
-
-                    MouseArea {
-                        id: lyricsToggleMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: {
-                            if (mediaCardRoot.showLyrics) {
-                                mediaCardRoot.closeLyrics();
-                            } else {
-                                mediaCardRoot.requestToggleLyrics();
-                            }
-                        }
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
-
-                // Previous Button
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: prevMa.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.08)
-
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        width: 15
-                        height: 15
-                        source: "media-skip-backward"
-                        color: "#ffffff"
-                        opacity: mediaCardRoot.canGoPrevious ? 1.0 : 0.4
-                    }
-
-                    MouseArea {
-                        id: prevMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        enabled: mediaCardRoot.canGoPrevious
-                        onClicked: mediaCardRoot.requestPrevious()
-                    }
-                }
-
-                // Play / Pause Button (Contrasting white circular button)
-                Rectangle {
-                    width: 44
-                    height: 44
-                    radius: 22
-                    color: playMa.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.95)
-
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        width: 18
-                        height: 18
-                        source: mediaCardRoot.isPlaying ? "media-playback-pause" : "media-playback-start"
-                        color: "#111418"
-                    }
-
-                    MouseArea {
-                        id: playMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        enabled: mediaCardRoot.canControl
-                        onClicked: mediaCardRoot.requestPlayPause()
-                    }
-                }
-
-                // Next Button
-                Rectangle {
-                    width: 36
-                    height: 36
-                    radius: 18
-                    color: nextMa.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.08)
-
-                    Kirigami.Icon {
-                        anchors.centerIn: parent
-                        width: 15
-                        height: 15
-                        source: "media-skip-forward"
-                        color: "#ffffff"
-                        opacity: mediaCardRoot.canGoNext ? 1.0 : 0.4
-                    }
-
-                    MouseArea {
-                        id: nextMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        enabled: mediaCardRoot.canGoNext
-                        onClicked: mediaCardRoot.requestNext()
-                    }
-                }
-
-                Item { Layout.fillWidth: true }
-
-                // Volume Button with Hover Slider (Right side: Gambar 4)
+                // Volume Button with Hover Slider on Left side
                 Item {
                     id: volHoverContainer
-                    implicitWidth: volHoverMa.containsMouse || volSliderRow.visible ? 116 : 36
-                    implicitHeight: 36
+                    anchors.left: parent.left
+                    anchors.verticalCenter: parent.verticalCenter
+                    implicitWidth: volHoverMa.containsMouse || volSliderRow.visible ? 104 : 32
+                    implicitHeight: 32
 
                     Behavior on implicitWidth {
                         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
@@ -543,10 +451,10 @@ Item {
 
                     Rectangle {
                         anchors.fill: parent
-                        radius: 18
+                        radius: 16
                         color: volHoverMa.containsMouse ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.08)
                         border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.1)
+                        border.color: Qt.rgba(1, 1, 1, 0.10)
 
                         RowLayout {
                             anchors.fill: parent
@@ -554,7 +462,6 @@ Item {
                             anchors.rightMargin: 8
                             spacing: 6
 
-                            // Expanding mini volume slider
                             Item {
                                 id: volSliderRow
                                 Layout.fillWidth: true
@@ -565,16 +472,16 @@ Item {
                                     anchors.left: parent.left
                                     anchors.right: parent.right
                                     anchors.verticalCenter: parent.verticalCenter
-                                    height: 4
-                                    radius: 2
+                                    height: 3
+                                    radius: 1.5
                                     color: Qt.rgba(1, 1, 1, 0.25)
 
                                     Rectangle {
                                         anchors.left: parent.left
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        width: Math.max(4, parent.width * (mediaCardRoot.currentVolumePct / 100))
-                                        radius: 2
+                                        width: Math.max(3, parent.width * (mediaCardRoot.currentVolumePct / 100))
+                                        radius: 1.5
                                         color: "#ffffff"
                                     }
                                 }
@@ -596,10 +503,10 @@ Item {
                                 }
                             }
 
-                            Kirigami.Icon {
-                                width: 16
-                                height: 16
-                                source: mediaCardRoot.currentVolumePct === 0 ? "audio-volume-muted" : "audio-volume-high"
+                            SFSymbolIcon {
+                                width: 14
+                                height: 14
+                                name: mediaCardRoot.currentVolumePct === 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
                                 color: "#ffffff"
                                 Layout.alignment: Qt.AlignVCenter
                             }
@@ -613,6 +520,123 @@ Item {
                         acceptedButtons: Qt.NoButton
                     }
                 }
+
+                // Centered Transport Controls (Prev, Play/Pause White Pill, Next)
+                RowLayout {
+                    anchors.centerIn: parent
+                    spacing: 18
+
+                    // Previous Button (<<)
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 16
+                        color: prevMa.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : "transparent"
+
+                        SFSymbolIcon {
+                            anchors.centerIn: parent
+                            width: 16
+                            height: 16
+                            name: "backward.fill"
+                            color: "#ffffff"
+                            opacity: mediaCardRoot.canGoPrevious ? 1.0 : 0.4
+                        }
+
+                        MouseArea {
+                            id: prevMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            enabled: mediaCardRoot.canGoPrevious
+                            onClicked: mediaCardRoot.requestPrevious()
+                        }
+                    }
+
+                    // Play / Pause Button (Bulat / Pill Elegan Putih Kontras)
+                    Rectangle {
+                        width: 38
+                        height: 38
+                        radius: 19
+                        color: playMa.containsMouse ? "#f0f0f0" : "#ffffff"
+
+                        SFSymbolIcon {
+                            anchors.centerIn: parent
+                            width: 16
+                            height: 16
+                            name: mediaCardRoot.isPlaying ? "pause.fill" : "play.fill"
+                            color: "#111418"
+                        }
+
+                        MouseArea {
+                            id: playMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            enabled: mediaCardRoot.canControl
+                            onClicked: mediaCardRoot.requestPlayPause()
+                        }
+                    }
+
+                    // Next Button (>>)
+                    Rectangle {
+                        width: 32
+                        height: 32
+                        radius: 16
+                        color: nextMa.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : "transparent"
+
+                        SFSymbolIcon {
+                            anchors.centerIn: parent
+                            width: 16
+                            height: 16
+                            name: "forward.fill"
+                            color: "#ffffff"
+                            opacity: mediaCardRoot.canGoNext ? 1.0 : 0.4
+                        }
+
+                        MouseArea {
+                            id: nextMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            enabled: mediaCardRoot.canGoNext
+                            onClicked: mediaCardRoot.requestNext()
+                        }
+                    }
+                }
+
+                // Output / Lyrics Switch Toggle Button in Right Corner
+                Rectangle {
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    width: 32
+                    height: 32
+                    radius: 16
+                    color: lyricsToggleMa.containsMouse ? Qt.rgba(1, 1, 1, 0.20) : Qt.rgba(1, 1, 1, 0.08)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.10)
+
+                    SFSymbolIcon {
+                        anchors.centerIn: parent
+                        width: 16
+                        height: 16
+                        name: "quote.bubble.fill"
+                        color: "#ffffff"
+                    }
+
+                    MouseArea {
+                        id: lyricsToggleMa
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (mediaCardRoot.showLyrics) {
+                                mediaCardRoot.closeLyrics();
+                            } else {
+                                mediaCardRoot.requestToggleLyrics();
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -622,49 +646,48 @@ Item {
     // ==============================================================
     Item {
         id: lyricsSplitView
-        anchors.top: headerClockContainer.bottom
-        anchors.topMargin: 4
-        anchors.bottom: parent.bottom
-        anchors.bottomMargin: 24 // Sisakan ruang untuk pagination dots di bawah
-        anchors.left: parent.left
-        anchors.leftMargin: 44   // Internal padding agar kontrol tidak tertabrak tombol panah melayang
-        anchors.right: parent.right
-        anchors.rightMargin: 44  // Internal padding agar teks lirik tidak tertabrak tombol panah melayang
+        anchors.fill: parent
+        anchors.topMargin: 12
+        anchors.bottomMargin: 12
+        anchors.leftMargin: 38
+        anchors.rightMargin: 38
         visible: mediaCardRoot.showLyrics
         clip: true
 
-        // --- KOLOM KIRI (Mini Media Controls, ~38% lebar) ---
+        // --- KOLOM KIRI (Mini Media Controls, ~44% lebar) ---
         Item {
             id: leftPlayerColumn
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: parent.left
-            width: parent.width * 0.38
+            width: parent.width * 0.44
 
             ColumnLayout {
-                anchors.fill: parent
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
                 spacing: 8
 
-                // Cover art mini, judul lagu, artis
+                // Baris 1: Cover album mini (42x42 rounded 10), judul lagu (bold), artis
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 8
+                    spacing: 10
 
                     Rectangle {
-                        width: 46
-                        height: 46
+                        Layout.preferredWidth: 42
+                        Layout.preferredHeight: 42
                         radius: 10
                         color: Qt.rgba(1, 1, 1, 0.08)
                         border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.14)
+                        border.color: Qt.rgba(1, 1, 1, 0.12)
                         clip: true
 
                         Image {
                             id: miniAlbumArtImg
                             anchors.fill: parent
                             source: mediaCardRoot.albumArtUrl !== "" ? mediaCardRoot.albumArtUrl : ""
-                            sourceSize.width: 92
-                            sourceSize.height: 92
+                            sourceSize.width: 84
+                            sourceSize.height: 84
                             fillMode: Image.PreserveAspectCrop
                             asynchronous: true
                             visible: status === Image.Ready && source != ""
@@ -682,12 +705,12 @@ Item {
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 1
+                        spacing: 2
 
                         Text {
                             text: mediaCardRoot.trackTitle !== "" ? mediaCardRoot.trackTitle : i18n("No Media Playing")
                             font.pixelSize: 13
-                            font.weight: Font.Bold
+                            font.bold: true
                             font.family: "Inter, Roboto, sans-serif"
                             color: "#ffffff"
                             elide: Text.ElideRight
@@ -695,31 +718,32 @@ Item {
                         }
 
                         Text {
-                            text: mediaCardRoot.trackArtist !== "" ? mediaCardRoot.trackArtist : ""
-                            font.pixelSize: 10
+                            text: mediaCardRoot.trackArtist !== "" ? mediaCardRoot.trackArtist : i18n("Unknown Artist")
+                            font.pixelSize: 11
                             font.family: "Inter, Roboto, sans-serif"
-                            color: "#9aa0a6"
+                            color: Qt.rgba(1, 1, 1, 0.65)
                             elide: Text.ElideRight
                             Layout.fillWidth: true
                         }
                     }
                 }
 
-                // Mini Timeline
+                // Baris 2: Mini Timeline (Elapsed, Progress Bar, Remaining)
                 RowLayout {
                     Layout.fillWidth: true
-                    spacing: 6
+                    spacing: 8
 
                     Text {
                         text: mediaCardRoot.formatTime(mediaCardRoot.trackPosition)
-                        font.pixelSize: 9
-                        color: "#9aa0a6"
+                        font.pixelSize: 10
+                        font.family: "Inter, Roboto, sans-serif"
+                        color: Qt.rgba(1, 1, 1, 0.65)
                     }
 
                     Item {
                         id: miniProgressBarItem
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 10
+                        Layout.preferredHeight: 12
 
                         Rectangle {
                             id: miniProgressTrack
@@ -728,7 +752,7 @@ Item {
                             anchors.verticalCenter: parent.verticalCenter
                             height: 3
                             radius: 1.5
-                            color: Qt.rgba(1, 1, 1, 0.2)
+                            color: Qt.rgba(1, 1, 1, 0.20)
 
                             Rectangle {
                                 anchors.left: parent.left
@@ -762,194 +786,146 @@ Item {
 
                     Text {
                         text: mediaCardRoot.formatRemaining(mediaCardRoot.trackPosition, mediaCardRoot.trackLength)
-                        font.pixelSize: 9
-                        color: "#9aa0a6"
+                        font.pixelSize: 10
+                        font.family: "Inter, Roboto, sans-serif"
+                        color: Qt.rgba(1, 1, 1, 0.65)
                     }
                 }
 
-                // Mini Controls
-                RowLayout {
+                // Baris 3: Tombol kontrol ringkas berjejer di tengah (<<, Play/Pause, >>)
+                Item {
                     Layout.fillWidth: true
-                    spacing: 6
+                    Layout.preferredHeight: 30
 
-                    // Active lyrics bubble button (two-way toggle: clicking exits lyrics mode)
-                    Rectangle {
-                        width: 28
-                        height: 28
-                        radius: 14
-                        color: "#ffffff"
-                        border.width: 1
-                        border.color: "#ffffff"
+                    RowLayout {
+                        anchors.centerIn: parent
+                        spacing: 22
 
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: 14
-                            height: 14
-                            source: "dialog-messages"
-                            color: "#111418"
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: 14
+                            color: prevMiniMa.containsMouse ? Qt.rgba(1, 1, 1, 0.15) : "transparent"
+
+                            SFSymbolIcon {
+                                anchors.centerIn: parent
+                                width: 15
+                                height: 15
+                                name: "backward.fill"
+                                color: "#ffffff"
+                                opacity: mediaCardRoot.canGoPrevious ? 1.0 : 0.4
+                            }
+
+                            MouseArea {
+                                id: prevMiniMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: mediaCardRoot.canGoPrevious
+                                onClicked: mediaCardRoot.requestPrevious()
+                            }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mediaCardRoot.closeLyrics()
-                        }
-                    }
+                        Rectangle {
+                            width: 30
+                            height: 30
+                            radius: 15
+                            color: playMiniMa.containsMouse ? Qt.rgba(1, 1, 1, 0.18) : "transparent"
 
-                    Item { Layout.fillWidth: true }
+                            SFSymbolIcon {
+                                anchors.centerIn: parent
+                                width: 17
+                                height: 17
+                                name: mediaCardRoot.isPlaying ? "pause.fill" : "play.fill"
+                                color: "#ffffff"
+                            }
 
-                    Rectangle {
-                        width: 28
-                        height: 28
-                        radius: 14
-                        color: prevMiniMa.containsMouse ? Qt.rgba(1, 1, 1, 0.2) : Qt.rgba(1, 1, 1, 0.08)
-
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: 12
-                            height: 12
-                            source: "media-skip-backward"
-                            color: "#ffffff"
-                        }
-
-                        MouseArea {
-                            id: prevMiniMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mediaCardRoot.requestPrevious()
-                        }
-                    }
-
-                    Rectangle {
-                        width: 34
-                        height: 34
-                        radius: 17
-                        color: "#ffffff"
-
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: 14
-                            height: 14
-                            source: mediaCardRoot.isPlaying ? "media-playback-pause" : "media-playback-start"
-                            color: "#111418"
+                            MouseArea {
+                                id: playMiniMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: mediaCardRoot.canControl
+                                onClicked: mediaCardRoot.requestPlayPause()
+                            }
                         }
 
-                        MouseArea {
-                            anchors.fill: parent
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mediaCardRoot.requestPlayPause()
-                        }
-                    }
+                        Rectangle {
+                            width: 28
+                            height: 28
+                            radius: 14
+                            color: nextMiniMa.containsMouse ? Qt.rgba(1, 1, 1, 0.15) : "transparent"
 
-                    Rectangle {
-                        width: 28
-                        height: 28
-                        radius: 14
-                        color: nextMiniMa.containsMouse ? Qt.rgba(1, 1, 1, 0.2) : Qt.rgba(1, 1, 1, 0.08)
+                            SFSymbolIcon {
+                                anchors.centerIn: parent
+                                width: 15
+                                height: 15
+                                name: "forward.fill"
+                                color: "#ffffff"
+                                opacity: mediaCardRoot.canGoNext ? 1.0 : 0.4
+                            }
 
-                        Kirigami.Icon {
-                            anchors.centerIn: parent
-                            width: 12
-                            height: 12
-                            source: "media-skip-forward"
-                            color: "#ffffff"
-                        }
-
-                        MouseArea {
-                            id: nextMiniMa
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: mediaCardRoot.requestNext()
+                            MouseArea {
+                                id: nextMiniMa
+                                anchors.fill: parent
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                enabled: mediaCardRoot.canGoNext
+                                onClicked: mediaCardRoot.requestNext()
+                            }
                         }
                     }
-
-                    Item { Layout.fillWidth: true }
                 }
-
-                Item { Layout.fillHeight: true }
             }
         }
 
-        // Garis Pemisah Halus Antar Kolom (Divider)
-        Rectangle {
-            anchors.left: leftPlayerColumn.right
-            anchors.top: parent.top
-            anchors.bottom: parent.bottom
-            anchors.topMargin: 4
-            anchors.bottomMargin: 4
-            width: 1
-            color: Qt.rgba(1, 1, 1, 0.08)
-        }
-
-        // --- KOLOM KANAN (Daftar Lirik Tersinkronisasi, ~62% lebar) ---
+        // --- KOLOM KANAN (Daftar Lirik Tersinkronisasi, ~56% lebar, tanpa border vertikal) ---
         Item {
             id: rightLyricsColumn
             anchors.top: parent.top
             anchors.bottom: parent.bottom
             anchors.left: leftPlayerColumn.right
-            anchors.leftMargin: 16
+            anchors.leftMargin: 20
             anchors.right: parent.right
             clip: true
 
-            // Header baris lirik & tombol tutup mode lirik
-            Item {
-                id: lyricsHeaderRow
+            // Tombol kembali ke mode media player biasa (✕) floating di sudut kanan atas
+            MouseArea {
                 anchors.top: parent.top
-                anchors.left: parent.left
                 anchors.right: parent.right
-                height: 20
+                anchors.topMargin: -2
+                width: 22
+                height: 22
+                z: 10
+                cursorShape: Qt.PointingHandCursor
+                hoverEnabled: true
+                onClicked: mediaCardRoot.closeLyrics()
 
-                Text {
-                    text: i18n("Synced Lyrics")
-                    font.pixelSize: 11
-                    font.bold: true
-                    color: Qt.rgba(1, 1, 1, 0.45)
-                    anchors.left: parent.left
-                    anchors.verticalCenter: parent.verticalCenter
-                }
+                Rectangle {
+                    anchors.fill: parent
+                    radius: 11
+                    color: parent.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.06)
 
-                // Tombol kembali ke mode media player biasa (✕)
-                MouseArea {
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    width: 22
-                    height: 22
-                    cursorShape: Qt.PointingHandCursor
-                    hoverEnabled: true
-                    onClicked: mediaCardRoot.closeLyrics()
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 11
-                        color: parent.containsMouse ? Qt.rgba(1, 1, 1, 0.2) : Qt.rgba(1, 1, 1, 0.08)
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "✕"
-                            color: Qt.rgba(1, 1, 1, 0.8)
-                            font.pixelSize: 11
-                        }
+                    SFSymbolIcon {
+                        anchors.centerIn: parent
+                        width: 10
+                        height: 10
+                        name: "xmark"
+                        color: parent.parent.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.6)
                     }
                 }
             }
 
-            // ListView Lirik Berjalan
+            // ListView Lirik Berjalan (Pusat vertikal di tengah, auto-scroll halus)
             ListView {
                 id: lyricsListView
-                anchors.top: lyricsHeaderRow.bottom
-                anchors.topMargin: 4
-                anchors.bottom: parent.bottom
-                anchors.left: parent.left
-                anchors.right: parent.right
+                anchors.fill: parent
                 clip: true
                 spacing: 6
                 model: mediaCardRoot.lyricsList
                 currentIndex: mediaCardRoot.currentLyricIndex
-                preferredHighlightBegin: height * 0.35
-                preferredHighlightEnd: height * 0.55
+                preferredHighlightBegin: height * 0.5 - 12
+                preferredHighlightEnd: height * 0.5 + 12
                 highlightRangeMode: ListView.StrictlyEnforceRange
                 highlightMoveDuration: 220
 
@@ -966,19 +942,21 @@ Item {
 
                 delegate: Item {
                     width: ListView.view.width
-                    height: lyricText.implicitHeight + 10
+                    height: lyricText.implicitHeight + 8
+
+                    readonly property bool isCurrent: index === mediaCardRoot.currentLyricIndex
 
                     Text {
                         id: lyricText
                         width: parent.width
                         text: (modelData && modelData.text !== undefined) ? modelData.text : (modelData || "")
                         wrapMode: Text.WordWrap
-                        font.pixelSize: index === mediaCardRoot.currentLyricIndex ? 15 : 13
-                        font.bold: index === mediaCardRoot.currentLyricIndex
+                        font.pixelSize: isCurrent ? 15 : 13
+                        font.bold: isCurrent
                         font.family: mediaCardRoot.lyricsFontFamily !== "" ? mediaCardRoot.lyricsFontFamily : "Inter, Roboto, sans-serif"
-                        color: index === mediaCardRoot.currentLyricIndex ? "#ffffff" : Qt.rgba(1, 1, 1, 0.35)
+                        color: isCurrent ? "#ffffff" : Qt.rgba(1, 1, 1, 0.35)
                         horizontalAlignment: Text.AlignLeft
-                        scale: index === mediaCardRoot.currentLyricIndex ? 1.02 : 1.0
+                        scale: isCurrent ? 1.02 : 1.0
                         transformOrigin: Item.Left
 
                         Behavior on color { ColorAnimation { duration: 150 } }

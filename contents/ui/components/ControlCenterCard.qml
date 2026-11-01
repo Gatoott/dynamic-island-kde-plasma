@@ -238,15 +238,31 @@ Item {
     }
 
     // =============================================================
-    // UI LAYOUT (Gambar 5)
+    // UI LAYOUT (Scrollable Flickable)
     // =============================================================
-    ColumnLayout {
+    Flickable {
+        id: controlCenterFlickable
         anchors.fill: parent
-        anchors.leftMargin: 44
-        anchors.rightMargin: 44
-        anchors.topMargin: 8
-        anchors.bottomMargin: 14
-        spacing: 11
+        anchors.topMargin: 12
+        anchors.bottomMargin: 24
+        anchors.leftMargin: 44 // Ruang aman dari tombol panah navigasi kiri
+        anchors.rightMargin: 44 // Ruang aman dari tombol panah navigasi kanan
+        clip: true // Mencegah item meluber keluar batas kartu
+
+        contentWidth: width
+        contentHeight: controlCenterLayout.implicitHeight
+
+        boundsBehavior: Flickable.StopAtBounds
+
+        WheelHandler {
+            target: controlCenterFlickable
+            acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        }
+
+        ColumnLayout {
+            id: controlCenterLayout
+            width: controlCenterFlickable.width - (controlCenterFlickable.contentHeight > controlCenterFlickable.height ? 6 : 0)
+            spacing: 10
 
         // ---------------------------------------------------------
         // 1. Header Bar Status Monitor
@@ -983,4 +999,12 @@ Item {
             }
         }
     }
+
+    QQC2.ScrollBar.vertical: QQC2.ScrollBar {
+        policy: controlCenterFlickable.contentHeight > controlCenterFlickable.height 
+            ? QQC2.ScrollBar.AsNeeded 
+            : QQC2.ScrollBar.AlwaysOff
+        width: 3
+    }
+}
 }
