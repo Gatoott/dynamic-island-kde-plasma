@@ -76,6 +76,27 @@ PlasmoidItem {
     readonly property int cfgMediaCardBgMode: Plasmoid.configuration.mediaCardBgMode !== undefined ? Plasmoid.configuration.mediaCardBgMode : 0
     readonly property int cfgLyricsBgMode: Plasmoid.configuration.lyricsBgMode !== undefined ? Plasmoid.configuration.lyricsBgMode : 1
 
+    // Mini Music Icon (Left of Clock) Customization
+    readonly property bool cfgMiniMusicIconEnabled: Plasmoid.configuration.miniMusicIconEnabled !== undefined ? Plasmoid.configuration.miniMusicIconEnabled : true
+    readonly property int cfgMiniMusicIconSize: Plasmoid.configuration.miniMusicIconSize || 13
+    readonly property int cfgMiniMusicIconWeight: Plasmoid.configuration.miniMusicIconWeight || 600
+    readonly property int cfgMiniMusicIconColorMode: Plasmoid.configuration.miniMusicIconColorMode !== undefined ? Plasmoid.configuration.miniMusicIconColorMode : 0
+    readonly property color cfgMiniMusicIconCustomColor: Qt.color(Plasmoid.configuration.miniMusicIconCustomColor || "#ffffff")
+
+    // Mini Visualizer (Compact Pill) Customization
+    readonly property int cfgMiniVisAlignment: Plasmoid.configuration.miniVisAlignment !== undefined ? Plasmoid.configuration.miniVisAlignment : 1
+    readonly property int cfgMiniVisColorMode: Plasmoid.configuration.miniVisColorMode !== undefined ? Plasmoid.configuration.miniVisColorMode : 0
+    readonly property color cfgMiniVisCustomColor: Qt.color(Plasmoid.configuration.miniVisCustomColor || "#38bdf8")
+    readonly property int cfgMiniVisBarWidth: Plasmoid.configuration.miniVisBarWidth !== undefined ? Plasmoid.configuration.miniVisBarWidth : 2
+    readonly property int cfgMiniVisSpacing: Plasmoid.configuration.miniVisSpacing !== undefined ? Plasmoid.configuration.miniVisSpacing : 2
+    readonly property int cfgMiniVisHeight: {
+        if (Plasmoid.configuration.miniVisHeight !== undefined) return Plasmoid.configuration.miniVisHeight;
+        if (Plasmoid.configuration.miniVisMaxHeight !== undefined) return Plasmoid.configuration.miniVisMaxHeight;
+        return 14;
+    }
+    readonly property int cfgMiniVisMaxHeight: cfgMiniVisHeight
+    readonly property bool cfgMiniVisRounded: Plasmoid.configuration.miniVisRounded !== undefined ? Plasmoid.configuration.miniVisRounded : true
+
     readonly property color cfgBgColor: {
         var c = Plasmoid.configuration.backgroundColor;
         var op = (Plasmoid.configuration.backgroundOpacity !== undefined) ? Plasmoid.configuration.backgroundOpacity : 0.95;
@@ -139,16 +160,18 @@ PlasmoidItem {
         }
         if (root.activeBatteryPill) return 210;
         if (root.showPillLyrics) {
-            // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer 22 if active) + 24 (left 12 + right 12)
+            // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer if active) + 24 (left 12 + right 12)
             var iconW = 14;
             var gap = 8;
-            var visW = root.cfgShowCompactVisualizer ? 22 : 0;
+            var visW = root.cfgShowCompactVisualizer ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 8) : 0;
             var textW = Math.ceil(pillLyricsMetrics.advanceWidth);
             var padding = 24;
             var totalW = iconW + gap + textW + visW + padding;
             return Math.max(160, Math.min(540, totalW));
         }
-        return root.isPlaying ? root.cfgCompactWidth + 30 : root.cfgCompactWidth;
+        var miniVisW = (root.cfgShowVisualizer) ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 12) : 0;
+        var musicIconExtraW = (root.cfgMiniMusicIconEnabled) ? Math.max(0, root.cfgMiniMusicIconSize - 12 + 6) : 0;
+        return root.isPlaying ? root.cfgCompactWidth + miniVisW + musicIconExtraW : root.cfgCompactWidth;
     }
 
     readonly property int currentNotchWidth: {
@@ -221,6 +244,63 @@ PlasmoidItem {
     }
     function previousTrack() {
         if (activePlayer) activePlayer.Previous();
+    }
+
+    // --- Dynamic Color Extraction from Album Art for Mini Visualizer ---
+    property color albumDominantColor: root.cfgAccentColor
+    Behavior on albumDominantColor { ColorAnimation { duration: 400 } }
+
+    Canvas {
+        id: globalColorSamplerCanvas
+        width: 16
+        height: 16
+        visible: false
+        property string imageSource: root.albumArtUrl
+
+        onImageSourceChanged: {
+            if (imageSource && imageSource !== "") {
+                loadImage(imageSource);
+            } else {
+                root.albumDominantColor = root.cfgAccentColor;
+            }
+        }
+
+        onImageLoaded: {
+            requestPaint();
+        }
+
+        onPaint: {
+            var ctx = getContext("2d");
+            ctx.clearRect(0, 0, width, height);
+            try {
+                ctx.drawImage(imageSource, 0, 0, width, height);
+                var imgData = ctx.getImageData(0, 0, width, height);
+                var data = imgData.data;
+                var r = 0, g = 0, b = 0, count = 0;
+                for (var i = 0; i < data.length; i += 4) {
+                    var pr = data[i];
+                    var pg = data[i+1];
+                    var pb = data[i+2];
+                    var brightness = (pr * 299 + pg * 587 + pb * 114) / 1000;
+                    if (brightness > 30 && brightness < 235) {
+                        r += pr;
+                        g += pg;
+                        b += pb;
+                        count++;
+                    }
+                }
+                if (count > 0) {
+                    r = Math.round(r / count);
+                    g = Math.round(g / count);
+                    b = Math.round(b / count);
+                    root.albumDominantColor = Qt.rgba(r / 255.0, g / 255.0, b / 255.0, 1.0);
+                } else {
+                    root.albumDominantColor = root.cfgAccentColor;
+                }
+            } catch (e) {
+                root.albumDominantColor = root.cfgAccentColor;
+            }
+        }
     }
     function seekTrack(posSeconds) {
         if (activePlayer && activePlayer.canSeek) {
@@ -1069,6 +1149,21 @@ PlasmoidItem {
             cfgLyricsFontBold: root.cfgLyricsFontBold
             cfgShowVisualizer: root.cfgShowVisualizer
             cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
+            albumDominantColor: root.albumDominantColor
+
+            miniVisBarWidth: root.cfgMiniVisBarWidth
+            miniVisHeight: root.cfgMiniVisHeight
+            miniVisSpacing: root.cfgMiniVisSpacing
+            miniVisColorMode: root.cfgMiniVisColorMode
+            miniVisCustomColor: root.cfgMiniVisCustomColor
+            miniVisAlignment: root.cfgMiniVisAlignment
+            miniVisRounded: root.cfgMiniVisRounded
+
+            miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
+            miniMusicIconSize: root.cfgMiniMusicIconSize
+            miniMusicIconWeight: root.cfgMiniMusicIconWeight
+            miniMusicIconColorMode: root.cfgMiniMusicIconColorMode
+            miniMusicIconCustomColor: root.cfgMiniMusicIconCustomColor
 
             // Compact state bindings
             activeNotificationPill: root.activeNotificationPill
@@ -1192,6 +1287,7 @@ PlasmoidItem {
                 cfgClockFontSize: root.cfgClockFontSize
                 cfgShowVisualizer: root.cfgShowVisualizer
                 cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
+                albumDominantColor: root.albumDominantColor
 
                 sysCpuPct: root.sysCpuPct
                 sysTemp: root.sysTemp
@@ -1333,6 +1429,21 @@ PlasmoidItem {
         cfgClockFontSize: root.cfgClockFontSize
         cfgShowVisualizer: root.cfgShowVisualizer
         cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
+        albumDominantColor: root.albumDominantColor
+
+        miniVisBarWidth: root.cfgMiniVisBarWidth
+        miniVisHeight: root.cfgMiniVisHeight
+        miniVisSpacing: root.cfgMiniVisSpacing
+        miniVisColorMode: root.cfgMiniVisColorMode
+        miniVisCustomColor: root.cfgMiniVisCustomColor
+        miniVisAlignment: root.cfgMiniVisAlignment
+        miniVisRounded: root.cfgMiniVisRounded
+
+        miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
+        miniMusicIconSize: root.cfgMiniMusicIconSize
+        miniMusicIconWeight: root.cfgMiniMusicIconWeight
+        miniMusicIconColorMode: root.cfgMiniMusicIconColorMode
+        miniMusicIconCustomColor: root.cfgMiniMusicIconCustomColor
 
         sysCpuPct: root.sysCpuPct
         sysTemp: root.sysTemp

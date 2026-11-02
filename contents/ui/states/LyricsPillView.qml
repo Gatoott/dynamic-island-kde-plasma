@@ -10,6 +10,7 @@ Item {
     property string trackTitle: ""
     property string trackArtist: ""
     property color accentColor: "#3daee9"
+    property color albumColor: accentColor
     property int fontSize: 13
     property string lyricsFontFamily: ""
     property bool lyricsFontBold: true
@@ -71,12 +72,8 @@ Item {
             id: miniVisualizer
             Layout.alignment: Qt.AlignVCenter
             isPlaying: lyricsPillRoot.isPlaying
-            barColor: lyricsPillRoot.accentColor
+            albumColor: lyricsPillRoot.albumColor || lyricsPillRoot.accentColor
             visible: lyricsPillRoot.showCompactVisualizer
-            barCount: 4
-            barWidth: 2
-            spacing: 2
-            maxHeight: 10
         }
     }
 }

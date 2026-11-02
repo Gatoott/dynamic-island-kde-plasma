@@ -100,7 +100,78 @@ Item {
     property int cfgClockFontSize: 13
     property bool cfgShowVisualizer: true
     property bool cfgShowCompactVisualizer: false
+    property color albumDominantColor: cfgAccentColor
     property string currentDateString: ""
+
+    // Mini Audio Visualizer Customization
+    property int miniVisBarWidth: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisBarWidth !== undefined) return plasmoid.configuration.miniVisBarWidth;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisBarWidth !== undefined) return Plasmoid.configuration.miniVisBarWidth;
+        return 2;
+    }
+    property int miniVisHeight: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration) {
+            if (plasmoid.configuration.miniVisHeight !== undefined) return plasmoid.configuration.miniVisHeight;
+            if (plasmoid.configuration.miniVisMaxHeight !== undefined) return plasmoid.configuration.miniVisMaxHeight;
+        }
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration) {
+            if (Plasmoid.configuration.miniVisHeight !== undefined) return Plasmoid.configuration.miniVisHeight;
+            if (Plasmoid.configuration.miniVisMaxHeight !== undefined) return Plasmoid.configuration.miniVisMaxHeight;
+        }
+        return 14;
+    }
+    property int miniVisSpacing: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisSpacing !== undefined) return plasmoid.configuration.miniVisSpacing;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisSpacing !== undefined) return Plasmoid.configuration.miniVisSpacing;
+        return 2;
+    }
+    property int miniVisColorMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisColorMode !== undefined) return plasmoid.configuration.miniVisColorMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisColorMode !== undefined) return Plasmoid.configuration.miniVisColorMode;
+        return 0;
+    }
+    property color miniVisCustomColor: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisCustomColor) return plasmoid.configuration.miniVisCustomColor;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisCustomColor) return Plasmoid.configuration.miniVisCustomColor;
+        return Qt.color("#38bdf8");
+    }
+    property int miniVisAlignment: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisAlignment !== undefined) return plasmoid.configuration.miniVisAlignment;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisAlignment !== undefined) return Plasmoid.configuration.miniVisAlignment;
+        return 1;
+    }
+    property bool miniVisRounded: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisRounded !== undefined) return plasmoid.configuration.miniVisRounded;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisRounded !== undefined) return Plasmoid.configuration.miniVisRounded;
+        return true;
+    }
+
+    // Mini Music Icon (Left of Clock) Customization
+    property bool miniMusicIconEnabled: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
+        return true;
+    }
+    property int miniMusicIconSize: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
+        return 13;
+    }
+    property int miniMusicIconWeight: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
+        return 600;
+    }
+    property int miniMusicIconColorMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
+        return 0;
+    }
+    property color miniMusicIconCustomColor: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return plasmoid.configuration.miniMusicIconCustomColor;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Plasmoid.configuration.miniMusicIconCustomColor;
+        return Qt.color("#ffffff");
+    }
 
     // System Metrics
     property int sysCpuPct: 12
@@ -503,6 +574,7 @@ Item {
                 trackTitle: unifiedNotchRoot.trackTitle
                 trackArtist: unifiedNotchRoot.trackArtist
                 accentColor: unifiedNotchRoot.cfgAccentColor
+                albumColor: unifiedNotchRoot.albumDominantColor
                 fontSize: unifiedNotchRoot.cfgLyricsFontSize
                 lyricsFontFamily: unifiedNotchRoot.cfgLyricsFontFamily
                 lyricsFontBold: unifiedNotchRoot.cfgLyricsFontBold
@@ -521,10 +593,24 @@ Item {
                 trackTitle: unifiedNotchRoot.trackTitle
                 trackArtist: unifiedNotchRoot.trackArtist
                 accentColor: unifiedNotchRoot.cfgAccentColor
+                albumColor: unifiedNotchRoot.albumDominantColor
                 fontSize: unifiedNotchRoot.cfgClockFontSize
                 clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
                 clockFontBold: unifiedNotchRoot.cfgClockFontBold
                 showVisualizer: unifiedNotchRoot.cfgShowVisualizer
+                miniVisBarWidth: unifiedNotchRoot.miniVisBarWidth
+                miniVisHeight: unifiedNotchRoot.miniVisHeight
+                miniVisSpacing: unifiedNotchRoot.miniVisSpacing
+                miniVisColorMode: unifiedNotchRoot.miniVisColorMode
+                miniVisCustomColor: unifiedNotchRoot.miniVisCustomColor
+                miniVisAlignment: unifiedNotchRoot.miniVisAlignment
+                miniVisRounded: unifiedNotchRoot.miniVisRounded
+
+                miniMusicIconEnabled: unifiedNotchRoot.miniMusicIconEnabled
+                miniMusicIconSize: unifiedNotchRoot.miniMusicIconSize
+                miniMusicIconWeight: unifiedNotchRoot.miniMusicIconWeight
+                miniMusicIconColorMode: unifiedNotchRoot.miniMusicIconColorMode
+                miniMusicIconCustomColor: unifiedNotchRoot.miniMusicIconCustomColor
             }
 
             MouseArea {
