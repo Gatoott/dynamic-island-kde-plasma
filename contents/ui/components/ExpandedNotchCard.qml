@@ -8,7 +8,7 @@ import "../states"
 
 Item {
     id: unifiedNotchRoot
-    clip: false
+    clip: true
 
     // Pastikan root item kartu menempel kokoh di bibir atas container:
     anchors.top: parent ? parent.top : undefined
@@ -151,6 +151,10 @@ Item {
     property real bodyOpacity: 1.0
     property bool isOverlayDialog: false
 
+    // Flag pelindung transisi atomik
+    property bool isClosing: false
+    property bool isOpening: false
+
     property real cfgNotchWingRadius: {
         if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.notchWingRadius !== undefined) return plasmoid.configuration.notchWingRadius;
         if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.notchWingRadius !== undefined) return Plasmoid.configuration.notchWingRadius;
@@ -167,8 +171,10 @@ Item {
     property real cornerRadius: cfgNotchBottomRadius
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
-    // Tetapkan satu nilai tinggi tetap yang dipakai bersama di semua tab (Uniform Height):
+    // Tetapkan satu nilai tinggi & lebar tetap (Uniform Dimensions):
     readonly property real standardCardHeight: 180
+    readonly property real standardCardWidth: getTargetWidthForTab(currentExpandedTab, showLyrics)
+    property alias expandedContentArea: expandedContent
 
     // Pemetaan Dimensi Eksplisit Tiap Tab (Anti-NaN & Anti-Squish)
     function getTargetWidthForTab(tabIndex, lyricsActive) {
@@ -190,9 +196,10 @@ Item {
     height: targetH
     opacity: 1.0
 
-    readonly property bool isMorphing: widthAnim.running || heightAnim.running
+    readonly property bool isMorphing: widthAnim.running || heightAnim.running || closeSequenceAnimation.running || openSequenceAnimation.running
 
     Behavior on targetW {
+        enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
         NumberAnimation {
             id: widthAnim
             duration: 280
@@ -200,6 +207,7 @@ Item {
         }
     }
     Behavior on targetH {
+        enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
         NumberAnimation {
             id: heightAnim
             duration: 280
@@ -207,50 +215,133 @@ Item {
         }
     }
 
-    onIsExpandedChanged: {
-        if (isExpanded) {
-            unifiedNotchRoot.bodyOpacity = 1.0;
-            unifiedNotchRoot.opacity = 1.0;
-            unifiedNotchRoot.width = Qt.binding(function() {
-                return unifiedNotchRoot.isFloatingStyle ? unifiedNotchRoot.targetW : (unifiedNotchRoot.targetW + (unifiedNotchRoot.effectiveWingRadius * 2));
-            });
-            unifiedNotchRoot.height = Qt.binding(function() {
-                return unifiedNotchRoot.targetH;
-            });
-        } else {
-            // Jika selisih tinggi sudah sangat kecil, langsung selesaikan tanpa menunggu animasi
-            if (Math.abs(unifiedNotchRoot.height - compactHeight) < 2) {
-                unifiedNotchRoot.collapseCompleted();
-                unifiedNotchRoot.collapseFinished();
-            }
-        }
-    }
+    // -------------------------------------------------------------
+    // TRANSISI PENUTUPAN ATOMIK (Anti-Flicker & Ghost Frame Shield)
+    // -------------------------------------------------------------
+    ParallelAnimation {
+        id: closeSequenceAnimation
 
-    Timer {
-        id: bufferFlushTimer
-        interval: 20
-        repeat: false
-        onTriggered: {
-            console.log("[NOTCH] T=300ms: GPU buffer kosong transparan ter-flush, eksekusi handoff!");
+        // 1. Fade out konten secara cepat (80ms)
+        NumberAnimation {
+            target: expandedContent
+            property: "opacity"
+            to: 0.0
+            duration: 80
+            easing.type: Easing.OutQuad
+        }
+
+        // 2. Susutkan dimensi kartu ke ukuran compactWidth & compactHeight (180ms)
+        NumberAnimation {
+            target: unifiedNotchRoot
+            property: "targetW"
+            to: unifiedNotchRoot.compactWidth
+            duration: 180
+            easing.type: Easing.InOutCubic
+        }
+        NumberAnimation {
+            target: unifiedNotchRoot
+            property: "targetH"
+            to: unifiedNotchRoot.compactHeight
+            duration: 180
+            easing.type: Easing.InOutCubic
+        }
+
+        onFinished: {
+            unifiedNotchRoot.isClosing = false;
             unifiedNotchRoot.collapseCompleted();
             unifiedNotchRoot.collapseFinished();
+            Qt.callLater(function() {
+                expandedContent.opacity = 1.0;
+            });
         }
     }
 
-    Connections {
-        target: heightAnim
-        function onRunningChanged() {
-            if (!heightAnim.running && !unifiedNotchRoot.isExpanded) {
-                console.log("[NOTCH] T=280ms: Animasi ciut fisik selesai!");
-                if (unifiedNotchRoot.isOverlayDialog) {
-                    // Setel opacity bodi notch menjadi 0.0 (seketika kosong/transparan)
-                    unifiedNotchRoot.bodyOpacity = 0.0;
-                    // Jeda 1 frame (~20ms) agar GPU sempat mengosongkan buffer render sebelum unmap
-                    bufferFlushTimer.restart();
-                } else {
-                    unifiedNotchRoot.collapseCompleted();
-                    unifiedNotchRoot.collapseFinished();
-                }
+    // -------------------------------------------------------------
+    // TRANSISI PEMBUKAAN ATOMIK
+    // -------------------------------------------------------------
+    ParallelAnimation {
+        id: openSequenceAnimation
+
+        NumberAnimation {
+            target: unifiedNotchRoot
+            property: "targetW"
+            from: unifiedNotchRoot.compactWidth
+            to: unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics)
+            duration: 200
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: unifiedNotchRoot
+            property: "targetH"
+            from: unifiedNotchRoot.compactHeight
+            to: unifiedNotchRoot.standardCardHeight
+            duration: 200
+            easing.type: Easing.OutCubic
+        }
+        SequentialAnimation {
+            PauseAnimation { duration: 30 }
+            NumberAnimation {
+                target: expandedContent
+                property: "opacity"
+                from: 0.0
+                to: 1.0
+                duration: 170
+                easing.type: Easing.OutQuad
+            }
+        }
+
+        onFinished: {
+            unifiedNotchRoot.isOpening = false;
+            unifiedNotchRoot.targetW = Qt.binding(function() {
+                return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics) : unifiedNotchRoot.compactWidth;
+            });
+            unifiedNotchRoot.targetH = Qt.binding(function() {
+                return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
+            });
+            expandedContent.opacity = 1.0;
+        }
+    }
+
+    function startCollapse() {
+        if (isClosing || !isExpanded) return;
+        if (openSequenceAnimation.running) {
+            openSequenceAnimation.stop();
+            isOpening = false;
+        }
+        isClosing = true;
+        closeSequenceAnimation.restart();
+    }
+
+    function startExpand() {
+        if (closeSequenceAnimation.running) {
+            closeSequenceAnimation.stop();
+            isClosing = false;
+        }
+        isOpening = true;
+        isClosing = false;
+        bodyOpacity = 1.0;
+        openSequenceAnimation.restart();
+    }
+
+    function resetGeometryAfterUnmap() {
+        targetW = Qt.binding(function() {
+            return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics) : unifiedNotchRoot.compactWidth;
+        });
+        targetH = Qt.binding(function() {
+            return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
+        });
+        expandedContent.opacity = 1.0;
+        bodyOpacity = 1.0;
+    }
+
+    onIsExpandedChanged: {
+        if (isExpanded) {
+            if (!isOpening && !isClosing) {
+                startExpand();
+            }
+        } else {
+            if (!isClosing && !isOpening && targetH > compactHeight) {
+                startCollapse();
             }
         }
     }
@@ -266,7 +357,7 @@ Item {
         visible: unifiedNotchRoot.isFloatingStyle
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
-        radius: unifiedNotchRoot.isExpanded ? unifiedNotchRoot.cornerRadius : (height / 2)
+        radius: (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? unifiedNotchRoot.cornerRadius : (height / 2)
         Behavior on radius { NumberAnimation { duration: 200 } }
         color: unifiedNotchRoot.effectiveBgColor
         border.width: 0
@@ -282,7 +373,7 @@ Item {
         visible: !unifiedNotchRoot.isFloatingStyle
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
-        layer.enabled: true
+        layer.enabled: visible && (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isMorphing || opacity > 0)
         layer.samples: 4
 
         // Siluet Tunggal Bodi Notch (Tanpa border samping & bawah)
@@ -450,10 +541,7 @@ Item {
             id: expandedContent
             anchors.fill: parent
             visible: opacity > 0
-            opacity: unifiedNotchRoot.isExpanded ? 1.0 : 0.0
-            Behavior on opacity {
-                NumberAnimation { duration: unifiedNotchRoot.isExpanded ? 200 : 80; easing.type: Easing.OutQuad }
-            }
+            opacity: 1.0
 
             // Clean top notch handle (mini pill grip)
             Item {
@@ -490,7 +578,7 @@ Item {
                     id: tabLoader
                     anchors.fill: parent
                     sourceComponent: {
-                        if (!unifiedNotchRoot.isExpanded) return null;
+                        if (!unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) return null;
                         switch (unifiedNotchRoot.activeTabKey) {
                             case "media": return mediaLyricsComponent;
                             case "notification": return notificationHistoryComponent;

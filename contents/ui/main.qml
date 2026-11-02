@@ -269,7 +269,7 @@ PlasmoidItem {
         id: lyricsSyncTimer
         interval: 100
         repeat: true
-        running: root.isPlaying
+        running: root.isPlaying && (root.isExpanded || root.showLyrics)
         onTriggered: {
             if (!root.isPlaying) return;
             var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
@@ -934,13 +934,14 @@ PlasmoidItem {
     // Timer Fallback Penutupan Dialog (Mencegah Deadlock):
     Timer {
         id: closeWatchdogTimer
-        interval: 380 // Sedikit lebih lama dari durasi animasi 280ms
+        interval: 380 // Sedikit lebih lama dari durasi animasi 220ms
         repeat: false
         onTriggered: {
-            if (!root.isExpanded) {
+            if (!root.isExpanded || (expandedCardPanel && expandedCardPanel.isClosing)) {
                 console.log("[NOTCH] Watchdog: Memastikan dialog tertutup dan notch panel aktif");
+                if (expandedCardPanel) expandedCardPanel.isClosing = false;
                 root.dialogSurfaceOpen = false;
-                panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
+                root.isExpanded = false;
             }
         }
     }
@@ -949,8 +950,11 @@ PlasmoidItem {
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
-        if (root.isExpanded) return;
+        var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+        if (card.isClosing) return;
 
+        // 1. Reset state penutup & pastikan tab aktif benar
+        card.isClosing = false;
         var wasNotifPill = root.activeNotificationPill;
 
         root.activeNotificationPill = false;
@@ -964,21 +968,30 @@ PlasmoidItem {
             root.currentExpandedTab = 0; // Default: Media Playing (Tab Utama)
         }
 
-        // Posisikan jendela dialog tepat di tengah atas layar:
-        expandedDialog.x = Math.round((Screen.width - expandedDialog.width) / 2) + root.cfgHorizontalOffset;
-        expandedDialog.y = root.isFloatingStyle ? root.effectiveVerticalOffset : 0;
+        if (root.inPanel) {
+            // Posisikan jendela dialog tepat di tengah atas layar:
+            expandedDialog.x = Math.round((Screen.width - expandedDialog.width) / 2) + root.cfgHorizontalOffset;
+            expandedDialog.y = root.isFloatingStyle ? root.effectiveVerticalOffset : 0;
 
-        // Inisialisasi dimensi awal kartu sebelum dibuka:
-        expandedCardPanel.width = expandedCardPanel.isFloatingStyle 
-            ? root.currentCompactWidth 
-            : (root.currentCompactWidth + (expandedCardPanel.effectiveWingRadius * 2));
-        expandedCardPanel.height = root.cfgCompactHeight;
-        expandedCardPanel.opacity = 1.0;
-        expandedCardPanel.bodyOpacity = 1.0;
+            // 2. RESTORASI UKURAN & VISIBILITAS KONTEN SECARA INSTAN:
+            card.targetW = card.getTargetWidthForTab(root.currentExpandedTab, root.showLyrics);
+            card.targetH = card.standardCardHeight;
+            card.expandedContentArea.opacity = 1.0; // Wajib di-reset agar tidak transparan saat dibuka kembali!
 
-        root.dialogSurfaceOpen = true;
-        panelNotchContainer.visible = false;
-        root.isExpanded = true;
+            // 3. Buka jendela surface dialog
+            root.dialogSurfaceOpen = true;
+            expandedDialog.visible = true;
+            root.isExpanded = true;
+
+            // 4. Jalankan animasi morphing pembuka
+            card.startExpand();
+        } else {
+            card.targetW = card.getTargetWidthForTab(root.currentExpandedTab, root.showLyrics);
+            card.targetH = card.standardCardHeight;
+            card.expandedContentArea.opacity = 1.0;
+            root.isExpanded = true;
+            desktopLivingNotch.startExpand();
+        }
     }
 
     function expandNotch(targetTabIndex) {
@@ -990,14 +1003,18 @@ PlasmoidItem {
     }
 
     function triggerCollapseSequence() {
-        if (!root.isExpanded) return;
+        var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+        if (card.isClosing || !root.isExpanded) return;
 
-        console.log("[NOTCH] T=0ms: Mulai animasi ciut fisik...");
-        root.isExpanded = false; // Memicu targetH -> compactHeight (36)
+        console.log("[NOTCH] Mulai penutupan atomik...");
         closeWatchdogTimer.restart(); // Jalankan timer pengaman anti-deadlock
+        card.startCollapse();
     }
 
     function toggleExpanded(targetTab) {
+        var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+        if (card.isClosing || card.isOpening) return;
+
         if (!root.isExpanded) {
             openNotch(targetTab);
         } else {
@@ -1011,7 +1028,7 @@ PlasmoidItem {
     // ==============================================================
     Item {
         id: panelNotchContainer
-        visible: root.inPanel && !root.isExpanded
+        visible: root.inPanel // Kapsul standby selalu aktif di scene graph saat di panel
         width: panelCompactNotch.width
         height: root.cfgCompactHeight
 
@@ -1021,7 +1038,13 @@ PlasmoidItem {
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
         opacity: root.isExpanded ? 0.0 : 1.0
-        enabled: !root.isExpanded
+        Behavior on opacity {
+            NumberAnimation {
+                duration: 140
+                easing.type: Easing.OutCubic
+            }
+        }
+        enabled: !root.isExpanded && !(expandedCardPanel && expandedCardPanel.isClosing) && !(expandedCardPanel && expandedCardPanel.isOpening)
 
         CompactView {
             id: panelCompactNotch
@@ -1088,7 +1111,7 @@ PlasmoidItem {
         visible: root.dialogSurfaceOpen
 
         onActiveChanged: {
-            if (!active && root.isExpanded) {
+            if (!active && root.isExpanded && !expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
                 console.log("[NOTCH] Focus lost terdeteksi, memicu triggerCollapseSequence()");
                 root.triggerCollapseSequence();
             }
@@ -1108,11 +1131,18 @@ PlasmoidItem {
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
             MouseArea {
                 anchors.fill: parent
-                onClicked: root.triggerCollapseSequence()
+                enabled: root.dialogSurfaceOpen && root.isExpanded
+                onClicked: {
+                    if (!expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
+                        root.triggerCollapseSequence();
+                    }
+                }
             }
 
             ExpandedNotchCard {
                 id: expandedCardPanel
+                visible: root.dialogSurfaceOpen
+                enabled: root.dialogSurfaceOpen && root.isExpanded
                 anchors.top: parent.top
                 anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -1223,16 +1253,23 @@ PlasmoidItem {
                 onRequestRemoveNotification: (id) => root.removeNotification(id)
 
                 onCollapseCompleted: {
-                    console.log("[NOTCH] T=300ms: Buffer transparan ter-flush, dialog dimatikan dan notch panel dimunculkan.");
-                    closeWatchdogTimer.stop();
-                    root.dialogSurfaceOpen = false;
-                    panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
+                    // Sinyal kompatibilitas
                 }
 
                 onCollapseFinished: {
+                    console.log("[NOTCH] Animasi ciut fisik selesai: unmap dialog window dan tampilkan standby pill.");
                     closeWatchdogTimer.stop();
+                    // 1. Matikan dialog surface window
+                    expandedDialog.visible = false;
                     root.dialogSurfaceOpen = false;
-                    panelNotchContainer.visible = Qt.binding(function() { return root.inPanel && !root.isExpanded; });
+                    root.isExpanded = false;
+                    expandedCardPanel.isClosing = false;
+
+                    // 2. Reset ukuran & konten kartu secara aman di tick berikutnya setelah window unmapped
+                    Qt.callLater(function() {
+                        expandedCardPanel.resetGeometryAfterUnmap();
+                        expandedCardPanel.expandedContentArea.opacity = 1.0;
+                    });
                 }
             }
         }
@@ -1355,6 +1392,14 @@ PlasmoidItem {
         }
         onRequestClearAllNotifications: root.clearAllNotifications()
         onRequestRemoveNotification: (id) => root.removeNotification(id)
+        onCollapseFinished: {
+            root.isExpanded = false;
+            desktopLivingNotch.isClosing = false;
+            Qt.callLater(function() {
+                desktopLivingNotch.resetGeometryAfterUnmap();
+                desktopLivingNotch.expandedContentArea.opacity = 1.0;
+            });
+        }
     }
 }
 

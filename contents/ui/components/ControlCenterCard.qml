@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import org.kde.plasma.plasmoid
@@ -238,46 +239,57 @@ Item {
     }
 
     // =============================================================
-    // UI LAYOUT (Scrollable Flickable)
+    // UI LAYOUT (Scrollable Pure Flickable - No ScrollBar Leak)
     // =============================================================
     Flickable {
         id: controlCenterFlickable
         anchors.fill: parent
         anchors.topMargin: 12
-        anchors.bottomMargin: 24
-        anchors.leftMargin: 44 // Ruang aman dari tombol panah navigasi kiri
-        anchors.rightMargin: 44 // Ruang aman dari tombol panah navigasi kanan
-        clip: true // Mencegah item meluber keluar batas kartu
+        anchors.bottomMargin: 16
+        anchors.leftMargin: 40 // Ruang aman dari tombol panah navigasi kiri
+        anchors.rightMargin: 40 // Ruang aman dari tombol panah navigasi kanan
+        clip: true
 
         contentWidth: width
-        contentHeight: controlCenterLayout.implicitHeight
-
+        contentHeight: contentCol.implicitHeight
         boundsBehavior: Flickable.StopAtBounds
+        interactive: true
 
+        onContentYChanged: {
+            var maxY = Math.max(0, contentHeight - height);
+            if (contentY < 0) {
+                contentY = 0;
+            } else if (contentY > maxY) {
+                contentY = maxY;
+            }
+        }
+
+        // TANGKAP PUTARAN MOUSE WHEEL & TRACKPAD GESTURE SECARA EKSPLISIT:
         WheelHandler {
             target: controlCenterFlickable
+            property: "contentY"
+            rotationScale: -2.5 // Sensitivitas scroll (~37.5px per notch)
             acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
         }
 
         ColumnLayout {
-            id: controlCenterLayout
-            width: controlCenterFlickable.width - (controlCenterFlickable.contentHeight > controlCenterFlickable.height ? 6 : 0)
-            spacing: 10
+            id: contentCol
+            width: controlCenterFlickable.width
+            spacing: 12
 
-        // ---------------------------------------------------------
-        // 1. Header Bar Status Monitor
-        // ---------------------------------------------------------
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
+            // ---------------------------------------------------------
+            // 1. Header Bar Status Monitor (Titik Tengah Absolut Terkunci)
+            // ---------------------------------------------------------
+            Item {
+                id: headerStatusBar
+                Layout.fillWidth: true
+                Layout.preferredHeight: 32
 
-            RowLayout {
-                anchors.fill: parent
-                spacing: 8
-
-                // Left: CPU & RAM Stats
+                // 1. SISI KIRI (CPU / RAM / Temp)
                 RowLayout {
-                    Layout.alignment: Qt.AlignVCenter | Qt.AlignLeft
+                    anchors.left: parent.left
+                    anchors.leftMargin: 0
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: 7
 
                     RowLayout {
@@ -327,46 +339,38 @@ Item {
                     }
                 }
 
-                Item { Layout.fillWidth: true }
+                // 2. TITIK TENGAH ABSOLUT (Jam & Tanggal Presisi di Sumbu Tengah)
+                ColumnLayout {
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    anchors.verticalCenter: parent.verticalCenter
+                    spacing: 1
 
-                // Center: Digital Clock & Date
-                Item {
-                    Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
-                    implicitWidth: centerClockCol.implicitWidth
-                    implicitHeight: centerClockCol.implicitHeight
+                    Text {
+                        text: controlCenterRoot.currentTimeString !== "" ? controlCenterRoot.currentTimeString : "00:00"
+                        font.pixelSize: 13
+                        font.bold: true
+                        font.family: "Inter, Roboto, sans-serif"
+                        color: "#ffffff"
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.alignment: Qt.AlignHCenter
+                    }
 
-                    Column {
-                        id: centerClockCol
-                        anchors.centerIn: parent
-                        spacing: 1
-
-                        Text {
-                            id: centerClockText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: controlCenterRoot.currentTimeString !== "" ? controlCenterRoot.currentTimeString : "00:00"
-                            font.pixelSize: 13
-                            font.weight: Font.Bold
-                            font.family: "Inter, Roboto, sans-serif"
-                            color: "#ffffff"
-                        }
-
-                        Text {
-                            id: centerDateText
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            text: controlCenterRoot.currentDateString !== "" ? controlCenterRoot.currentDateString : ""
-                            font.pixelSize: 9
-                            font.family: "Inter, Roboto, sans-serif"
-                            color: Qt.rgba(1, 1, 1, 0.65)
-                            visible: text !== ""
-                        }
+                    Text {
+                        text: controlCenterRoot.currentDateString !== "" ? controlCenterRoot.currentDateString : ""
+                        font.pixelSize: 10
+                        font.family: "Inter, Roboto, sans-serif"
+                        color: Qt.rgba(1, 1, 1, 0.65)
+                        horizontalAlignment: Text.AlignHCenter
+                        Layout.alignment: Qt.AlignHCenter
+                        visible: text !== ""
                     }
                 }
 
-                Item { Layout.fillWidth: true }
-
-                // Right: Battery & Temp
+                // 3. SISI KANAN (Baterai & Suhu Baterai)
                 RowLayout {
-                    Layout.alignment: Qt.AlignVCenter | Qt.AlignRight
+                    anchors.right: parent.right
+                    anchors.rightMargin: 0
+                    anchors.verticalCenter: parent.verticalCenter
                     spacing: 6
 
                     RowLayout {
@@ -403,7 +407,6 @@ Item {
                     }
                 }
             }
-        }
 
         // ---------------------------------------------------------
         // 2. Quick Toggle Cards (2-Column Grid)
@@ -901,16 +904,43 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        preventStealing: true
+                        preventStealing: false
+                        property real startX: 0
+                        property real startY: 0
+                        property bool isDraggingH: false
 
                         function updateVol(mouse) {
                             const pct = Math.max(0, Math.min(100, Math.round((mouse.x / width) * 100)));
                             controlCenterRoot.setVolumePercent(pct);
                         }
 
-                        onPressed: (mouse) => updateVol(mouse)
+                        onPressed: (mouse) => {
+                            startX = mouse.x;
+                            startY = mouse.y;
+                            isDraggingH = false;
+                            preventStealing = false;
+                            updateVol(mouse);
+                        }
                         onPositionChanged: (mouse) => {
-                            if (pressed) updateVol(mouse);
+                            if (pressed) {
+                                var dx = Math.abs(mouse.x - startX);
+                                var dy = Math.abs(mouse.y - startY);
+                                if (!isDraggingH && dx > 4 && dx > dy) {
+                                    isDraggingH = true;
+                                    preventStealing = true;
+                                }
+                                if (isDraggingH) {
+                                    updateVol(mouse);
+                                }
+                            }
+                        }
+                        onReleased: {
+                            preventStealing = false;
+                            isDraggingH = false;
+                        }
+                        onCanceled: {
+                            preventStealing = false;
+                            isDraggingH = false;
                         }
                     }
                 }
@@ -973,16 +1003,43 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
-                        preventStealing: true
+                        preventStealing: false
+                        property real startX: 0
+                        property real startY: 0
+                        property bool isDraggingH: false
 
                         function updateBright(mouse) {
                             const pct = Math.max(1, Math.min(100, Math.round((mouse.x / width) * 100)));
                             controlCenterRoot.setBrightnessPercent(pct);
                         }
 
-                        onPressed: (mouse) => updateBright(mouse)
+                        onPressed: (mouse) => {
+                            startX = mouse.x;
+                            startY = mouse.y;
+                            isDraggingH = false;
+                            preventStealing = false;
+                            updateBright(mouse);
+                        }
                         onPositionChanged: (mouse) => {
-                            if (pressed) updateBright(mouse);
+                            if (pressed) {
+                                var dx = Math.abs(mouse.x - startX);
+                                var dy = Math.abs(mouse.y - startY);
+                                if (!isDraggingH && dx > 4 && dx > dy) {
+                                    isDraggingH = true;
+                                    preventStealing = true;
+                                }
+                                if (isDraggingH) {
+                                    updateBright(mouse);
+                                }
+                            }
+                        }
+                        onReleased: {
+                            preventStealing = false;
+                            isDraggingH = false;
+                        }
+                        onCanceled: {
+                            preventStealing = false;
+                            isDraggingH = false;
                         }
                     }
                 }
@@ -998,13 +1055,12 @@ Item {
                 }
             }
         }
-    }
 
-    QQC2.ScrollBar.vertical: QQC2.ScrollBar {
-        policy: controlCenterFlickable.contentHeight > controlCenterFlickable.height 
-            ? QQC2.ScrollBar.AsNeeded 
-            : QQC2.ScrollBar.AlwaysOff
-        width: 3
+        // Spacer bawah agar slider paling bawah tidak terpotong saat scroll mentok
+        Item {
+            Layout.fillWidth: true
+            Layout.preferredHeight: 14
+        }
     }
 }
 }

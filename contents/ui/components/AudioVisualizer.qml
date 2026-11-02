@@ -34,7 +34,7 @@ Item {
                 height: visualizerRoot.isPlaying ? visualizerRoot.minHeight : visualizerRoot.minHeight
 
                 SequentialAnimation on height {
-                    running: visualizerRoot.isPlaying
+                    running: visualizerRoot.isPlaying && visualizerRoot.visible && visualizerRoot.opacity > 0
                     loops: Animation.Infinite
 
                     NumberAnimation {

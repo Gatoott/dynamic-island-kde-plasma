@@ -186,7 +186,7 @@ Item {
         Shape {
             anchors.fill: parent
             visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0
-            layer.enabled: true
+            layer.enabled: visible
             layer.samples: 4
             opacity: 0.75
 
@@ -307,25 +307,6 @@ Item {
                             font.family: "Inter, Roboto, sans-serif"
                             elide: Text.ElideRight
                             Layout.fillWidth: true
-                        }
-
-                        // Badge "E" (Explicit) ala Canopy / Spotify
-                        Rectangle {
-                            width: 14
-                            height: 14
-                            radius: 3
-                            color: Qt.rgba(1, 1, 1, 0.22)
-                            visible: mediaCardRoot.trackTitle !== ""
-                            Layout.alignment: Qt.AlignVCenter
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "E"
-                                color: "#ffffff"
-                                font.pixelSize: 8
-                                font.bold: true
-                                font.family: "Inter, Roboto, sans-serif"
-                            }
                         }
                     }
 
@@ -654,10 +635,40 @@ Item {
         visible: mediaCardRoot.showLyrics
         clip: true
 
+        // Jam & Tanggal Rata Kiri di Pojok Kiri Atas Mode Lirik
+        ColumnLayout {
+            id: lyricsClockContainer
+            anchors.top: parent.top
+            anchors.topMargin: 0
+            anchors.left: parent.left
+            anchors.leftMargin: 4
+            spacing: 1
+            z: 10
+
+            Text {
+                text: mediaCardRoot.currentTimeString !== "" ? mediaCardRoot.currentTimeString : "00:00"
+                font.bold: true
+                font.pixelSize: 13
+                font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
+                color: "#ffffff"
+                horizontalAlignment: Text.AlignLeft
+            }
+
+            Text {
+                text: mediaCardRoot.currentDateString !== "" ? mediaCardRoot.currentDateString : ""
+                font.pixelSize: 10
+                font.family: mediaCardRoot.clockFontFamily !== "" ? mediaCardRoot.clockFontFamily : "Inter, Roboto, sans-serif"
+                color: Qt.rgba(1, 1, 1, 0.65)
+                horizontalAlignment: Text.AlignLeft
+                visible: text !== ""
+            }
+        }
+
         // --- KOLOM KIRI (Mini Media Controls, ~44% lebar) ---
         Item {
             id: leftPlayerColumn
             anchors.top: parent.top
+            anchors.topMargin: 30 // Ruang aman agar tidak bertumpukan dengan jam di pojok kiri atas
             anchors.bottom: parent.bottom
             anchors.left: parent.left
             width: parent.width * 0.44
@@ -923,6 +934,8 @@ Item {
                 clip: true
                 spacing: 6
                 model: mediaCardRoot.lyricsList
+                reuseItems: true
+                cacheBuffer: 80
                 currentIndex: mediaCardRoot.currentLyricIndex
                 preferredHighlightBegin: height * 0.5 - 12
                 preferredHighlightEnd: height * 0.5 + 12
