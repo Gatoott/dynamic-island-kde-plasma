@@ -3,7 +3,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
-import org.kde.plasma.private.volume as Vol
+import org.kde.plasma.private.volume as PlasmaAudio
 import "."
 
 Item {
@@ -72,15 +72,68 @@ Item {
         mediaCardRoot.requestCloseLyrics();
     }
 
-    readonly property var sink: (typeof Vol !== "undefined" && Vol.PreferredDevice) ? Vol.PreferredDevice.sink : null
-    readonly property int currentVolumePct: sink ? Math.round(sink.volume / Vol.PulseAudio.NormalVolume * 100) : 70
+    // -------------------------------------------------------------
+    // Audio Backend (Plasma 6 Native PulseAudio / PipeWire)
+    // -------------------------------------------------------------
+    PlasmaAudio.SinkModel {
+        id: sinkModel
+        readonly property var preferredSink: mediaCardRoot.defaultSink
+        onDataChanged: mediaCardRoot.updateDefaultSink()
+        onRowsInserted: mediaCardRoot.updateDefaultSink()
+        onRowsRemoved: mediaCardRoot.updateDefaultSink()
+        onModelReset: mediaCardRoot.updateDefaultSink()
+        onCountChanged: mediaCardRoot.updateDefaultSink()
+        Component.onCompleted: mediaCardRoot.updateDefaultSink()
+    }
+
+    property var defaultSink: null
+
+    function updateDefaultSink() {
+        if (!sinkModel || sinkModel.count === 0) return;
+        var defaultRole = sinkModel.role("Default");
+        var pulseObjectRole = sinkModel.role("PulseObject");
+        for (var i = 0; i < sinkModel.count; ++i) {
+            var idx = sinkModel.index(i, 0);
+            var isDef = (defaultRole !== -1) ? sinkModel.data(idx, defaultRole) : false;
+            if (isDef === true || isDef === 1 || isDef === "true") {
+                defaultSink = (pulseObjectRole !== -1) ? sinkModel.data(idx, pulseObjectRole) : null;
+                return;
+            }
+        }
+        if (sinkModel.count > 0 && !defaultSink && pulseObjectRole !== -1) {
+            defaultSink = sinkModel.data(sinkModel.index(0, 0), pulseObjectRole);
+        }
+    }
+
+    readonly property real normalVolume: (defaultSink && defaultSink.baseVolume > 0) ? defaultSink.baseVolume : 65536
+    readonly property real currentVolumePercent: defaultSink 
+        ? Math.round((defaultSink.volume / normalVolume) * 100) 
+        : 0
+    readonly property int currentVolumePct: currentVolumePercent
+    readonly property bool isMuted: defaultSink ? defaultSink.muted : false
 
     function setVolumePercent(val) {
-        if (!sink) return;
+        if (!defaultSink) return;
         const clamped = Math.max(0, Math.min(100, Math.round(val)));
-        sink.volume = Math.round(clamped * Vol.PulseAudio.NormalVolume / 100);
-        if (sink.muted && clamped > 0) {
-            sink.muted = false;
+        defaultSink.volume = Math.round((clamped / 100) * normalVolume);
+        if (defaultSink.muted && clamped > 0) {
+            defaultSink.muted = false;
+        }
+    }
+
+    function toggleMute() {
+        if (!defaultSink) return;
+        defaultSink.muted = !defaultSink.muted;
+    }
+
+    function adjustVolumeWheel(wheel) {
+        if (!defaultSink) return;
+        var step = normalVolume * 0.05;
+        if (wheel.angleDelta.y > 0) {
+            defaultSink.volume = Math.min(defaultSink.volume + step, normalVolume);
+            if (defaultSink.muted) defaultSink.muted = false;
+        } else {
+            defaultSink.volume = Math.max(defaultSink.volume - step, 0);
         }
     }
 
@@ -163,7 +216,7 @@ Item {
         bottomRightRadius: 22
         clip: true
 
-        // Mode 0: Adaptive Album Tint (base color #0a0c10 layered with dynamic gradient below)
+        // Mode 0: Adaptive Album Tint (base color selaras dengan bodi dan sayap notch)
         // Mode 1: Glassy Translucent (Qt.rgba(0.08, 0.08, 0.12, 0.65))
         // Mode 2: Pure Pitch Dark (#09090b)
         color: {
@@ -175,17 +228,20 @@ Item {
             } else if (mediaCardRoot.mediaCardBgMode === 2) {
                 return "#09090b";
             } else {
-                return "#0a0c10";
+                return (mediaCardRoot.albumArtUrl !== "")
+                    ? Qt.darker(mediaCardRoot.albumDominantColor || "#121214", 2.5)
+                    : "#09090b";
             }
         }
+        Behavior on color { ColorAnimation { duration: 300 } }
 
         // Inner border highlight untuk efek glassy kaca (ditiadakan agar sisi samping & bawah bersih)
         border.width: 0
 
-        // Mode 0 Media Player: Rona Adaptif Gradien dari Album Cover
+        // Mode 0 Media Player: Rona Adaptif Gradien dari Album Cover (Pusat Cahaya Album Art)
         Shape {
             anchors.fill: parent
-            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0 && mediaCardRoot.albumArtUrl !== ""
             layer.enabled: visible
             layer.samples: 4
             opacity: 0.75
@@ -219,6 +275,21 @@ Item {
                     bottomLeftRadius: 22
                     bottomRightRadius: 22
                 }
+            }
+        }
+
+        // Mode 0 Ambient Bottom Blend: Mengalirkan gradasi halus rona album ke seluruh lengkungan bawah (Anti-Bocor Sudut)
+        Rectangle {
+            anchors.fill: parent
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0 && mediaCardRoot.albumArtUrl !== ""
+            topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            bottomLeftRadius: 22
+            bottomRightRadius: 22
+            gradient: Gradient {
+                GradientStop { position: 0.0; color: "transparent" }
+                GradientStop { position: 0.40; color: "transparent" }
+                GradientStop { position: 1.0; color: Qt.rgba(mediaCardRoot.albumDominantColor.r, mediaCardRoot.albumDominantColor.g, mediaCardRoot.albumDominantColor.b, 0.22) }
             }
         }
 
@@ -423,7 +494,7 @@ Item {
                     id: volHoverContainer
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: volHoverMa.containsMouse || volSliderRow.visible ? 104 : 32
+                    implicitWidth: volHoverMa.containsMouse || volSliderMa.pressed || (typeof speakerIconMa !== "undefined" && speakerIconMa.containsMouse) ? 104 : 32
                     implicitHeight: 32
 
                     Behavior on implicitWidth {
@@ -461,13 +532,14 @@ Item {
                                         anchors.left: parent.left
                                         anchors.top: parent.top
                                         anchors.bottom: parent.bottom
-                                        width: Math.max(3, parent.width * (mediaCardRoot.currentVolumePct / 100))
+                                        width: Math.max(3, parent.width * (mediaCardRoot.currentVolumePercent / 100))
                                         radius: 1.5
-                                        color: "#ffffff"
+                                        color: mediaCardRoot.isMuted ? Qt.rgba(1, 1, 1, 0.45) : "#ffffff"
                                     }
                                 }
 
                                 MouseArea {
+                                    id: volSliderMa
                                     anchors.fill: parent
                                     cursorShape: Qt.PointingHandCursor
                                     preventStealing: true
@@ -481,15 +553,33 @@ Item {
                                     onPositionChanged: (mouse) => {
                                         if (pressed) updateMiniVol(mouse);
                                     }
+                                    onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
                                 }
                             }
 
-                            SFSymbolIcon {
-                                width: 14
-                                height: 14
-                                name: mediaCardRoot.currentVolumePct === 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
-                                color: "#ffffff"
+                            Item {
+                                Layout.preferredWidth: 16
+                                Layout.preferredHeight: 16
                                 Layout.alignment: Qt.AlignVCenter
+
+                                SFSymbolIcon {
+                                    anchors.centerIn: parent
+                                    width: 14
+                                    height: 14
+                                    name: (mediaCardRoot.isMuted || mediaCardRoot.currentVolumePercent === 0)
+                                        ? "speaker.slash.fill"
+                                        : (mediaCardRoot.currentVolumePercent < 50 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
+                                    color: mediaCardRoot.isMuted ? Qt.rgba(1, 1, 1, 0.5) : "#ffffff"
+                                }
+
+                                MouseArea {
+                                    id: speakerIconMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: mediaCardRoot.toggleMute()
+                                    onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
+                                }
                             }
                         }
                     }
@@ -499,6 +589,7 @@ Item {
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.NoButton
+                        onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
                     }
                 }
 

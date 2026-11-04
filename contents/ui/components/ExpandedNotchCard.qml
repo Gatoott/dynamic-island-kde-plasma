@@ -3,6 +3,7 @@ import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Shapes
 import org.kde.kirigami as Kirigami
+import org.kde.plasma.private.volume as PlasmaAudio
 import "."
 import "../states"
 
@@ -67,13 +68,30 @@ Item {
         if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.lyricsBgMode !== undefined) return Plasmoid.configuration.lyricsBgMode;
         return 1;
     }
+    property int expandedBgMode: {
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.expandedBgMode !== undefined) return plasmoid.configuration.expandedBgMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.expandedBgMode !== undefined) return Plasmoid.configuration.expandedBgMode;
+        return -1;
+    }
 
-    readonly property color effectiveBgColor: {
+    readonly property bool hasActiveAlbumColor: (albumArtUrl !== "") && (albumDominantColor !== undefined)
+    readonly property bool isAdaptiveTintActive: {
+        if (expandedBgMode === 1) return true;
+        if (expandedBgMode === 0) return false;
+        return (activeTabKey === "media" && mediaCardBgMode === 0 && !showLyrics);
+    }
+
+    readonly property color cardBackgroundColor: {
         if (expandedBgStyle === 1) {
             return Qt.rgba(0.06, 0.06, 0.08, 0.72);
         }
+        if (isExpanded && isAdaptiveTintActive && hasActiveAlbumColor) {
+            return Qt.darker(albumDominantColor, 2.5);
+        }
         return cfgBgColor.a > 0 ? cfgBgColor : "#09090b";
     }
+
+    readonly property color effectiveBgColor: cardBackgroundColor
 
     readonly property color effectiveBorderColor: {
         if (expandedBgStyle === 1) {
@@ -239,7 +257,7 @@ Item {
 
     readonly property real wingRadius: cfgNotchWingRadius
     readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
-    property real cornerRadius: cfgNotchBottomRadius
+    property real cornerRadius: (isExpanded && !isClosing) ? 22 : cfgNotchBottomRadius
     Behavior on cornerRadius { NumberAnimation { duration: 200 } }
 
     // Tetapkan satu nilai tinggi & lebar tetap (Uniform Dimensions):
@@ -431,6 +449,7 @@ Item {
         radius: (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? unifiedNotchRoot.cornerRadius : (height / 2)
         Behavior on radius { NumberAnimation { duration: 200 } }
         color: unifiedNotchRoot.effectiveBgColor
+        Behavior on color { ColorAnimation { duration: 300 } }
         border.width: 0
         clip: true
     }
@@ -452,6 +471,7 @@ Item {
             strokeColor: "transparent"
             strokeWidth: 0
             fillColor: unifiedNotchRoot.effectiveBgColor
+            Behavior on fillColor { ColorAnimation { duration: 300 } }
 
             // Mulai dari sayap lekukan kiri atas
             startX: 0
@@ -709,6 +729,7 @@ Item {
                         expandedBgStyle: unifiedNotchRoot.expandedBgStyle
                         mediaCardBgMode: unifiedNotchRoot.mediaCardBgMode
                         lyricsBgMode: unifiedNotchRoot.lyricsBgMode
+                        albumDominantColor: unifiedNotchRoot.albumDominantColor
                         trackTitle: unifiedNotchRoot.trackTitle
                         trackArtist: unifiedNotchRoot.trackArtist
                         trackAlbum: unifiedNotchRoot.trackAlbum

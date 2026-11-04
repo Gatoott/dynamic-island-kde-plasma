@@ -131,6 +131,37 @@ Canvas {
             ctx.beginPath();
             ctx.arc(scx, scy, w * 0.40, -Math.PI * 0.28, Math.PI * 0.28);
             ctx.stroke();
+        } else if (name === "speaker.wave.1.fill") {
+            ctx.fillStyle = iconCanvas.color;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.10, h * 0.36);
+            ctx.lineTo(w * 0.30, h * 0.36);
+            ctx.lineTo(w * 0.52, h * 0.18);
+            ctx.lineTo(w * 0.52, h * 0.82);
+            ctx.lineTo(w * 0.30, h * 0.64);
+            ctx.lineTo(w * 0.10, h * 0.64);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            var scx1 = w * 0.44;
+            var scy1 = h * 0.50;
+            ctx.beginPath();
+            ctx.arc(scx1, scy1, w * 0.22, -Math.PI * 0.28, Math.PI * 0.28);
+            ctx.stroke();
+        } else if (name === "speaker.fill") {
+            ctx.fillStyle = iconCanvas.color;
+            ctx.beginPath();
+            ctx.moveTo(w * 0.10, h * 0.36);
+            ctx.lineTo(w * 0.30, h * 0.36);
+            ctx.lineTo(w * 0.52, h * 0.18);
+            ctx.lineTo(w * 0.52, h * 0.82);
+            ctx.lineTo(w * 0.30, h * 0.64);
+            ctx.lineTo(w * 0.10, h * 0.64);
+            ctx.closePath();
+            ctx.fill();
         } else if (name === "speaker.slash.fill") {
             ctx.fillStyle = iconCanvas.color;
             ctx.beginPath();

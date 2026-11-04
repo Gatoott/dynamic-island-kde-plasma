@@ -6,7 +6,7 @@ import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
 import org.kde.bluezqt as BluezQt
-import org.kde.plasma.private.volume as Vol
+import org.kde.plasma.private.volume as PlasmaAudio
 import org.kde.plasma.private.sessions as Sessions
 import org.kde.notificationmanager as NM
 import org.kde.ksysguard.sensors as Sensors
@@ -42,17 +42,67 @@ Item {
     }
 
     // -------------------------------------------------------------
-    // Volume Control (Pure Plasma 6 Native)
+    // Volume Control (Pure Plasma 6 Native PulseAudio / PipeWire)
     // -------------------------------------------------------------
-    readonly property var sink: (typeof Vol !== "undefined" && Vol.PreferredDevice) ? Vol.PreferredDevice.sink : null
-    readonly property int currentVolumePct: sink ? Math.round(sink.volume / Vol.PulseAudio.NormalVolume * 100) : 70
+    PlasmaAudio.SinkModel {
+        id: sinkModel
+        readonly property var preferredSink: controlCenterRoot.defaultSink
+        onDataChanged: controlCenterRoot.updateDefaultSink()
+        onRowsInserted: controlCenterRoot.updateDefaultSink()
+        onRowsRemoved: controlCenterRoot.updateDefaultSink()
+        onModelReset: controlCenterRoot.updateDefaultSink()
+        onCountChanged: controlCenterRoot.updateDefaultSink()
+        Component.onCompleted: controlCenterRoot.updateDefaultSink()
+    }
+
+    property var defaultSink: null
+
+    function updateDefaultSink() {
+        if (!sinkModel || sinkModel.count === 0) return;
+        var defaultRole = sinkModel.role("Default");
+        var pulseObjectRole = sinkModel.role("PulseObject");
+        for (var i = 0; i < sinkModel.count; ++i) {
+            var idx = sinkModel.index(i, 0);
+            var isDef = (defaultRole !== -1) ? sinkModel.data(idx, defaultRole) : false;
+            if (isDef === true || isDef === 1 || isDef === "true") {
+                defaultSink = (pulseObjectRole !== -1) ? sinkModel.data(idx, pulseObjectRole) : null;
+                return;
+            }
+        }
+        if (sinkModel.count > 0 && !defaultSink && pulseObjectRole !== -1) {
+            defaultSink = sinkModel.data(sinkModel.index(0, 0), pulseObjectRole);
+        }
+    }
+
+    readonly property real normalVolume: (defaultSink && defaultSink.baseVolume > 0) ? defaultSink.baseVolume : 65536
+    readonly property real currentVolumePercent: defaultSink 
+        ? Math.round((defaultSink.volume / normalVolume) * 100) 
+        : 0
+    readonly property int currentVolumePct: currentVolumePercent
+    readonly property bool isMuted: defaultSink ? defaultSink.muted : false
 
     function setVolumePercent(val) {
-        if (!sink) return;
+        if (!defaultSink) return;
         const clamped = Math.max(0, Math.min(100, Math.round(val)));
-        sink.volume = Math.round(clamped * Vol.PulseAudio.NormalVolume / 100);
-        if (sink.muted && clamped > 0) {
-            sink.muted = false;
+        defaultSink.volume = Math.round((clamped / 100) * normalVolume);
+        if (defaultSink.muted && clamped > 0) {
+            defaultSink.muted = false;
+        }
+    }
+
+    function toggleMute() {
+        if (!defaultSink) return;
+        defaultSink.muted = !defaultSink.muted;
+    }
+
+    function adjustVolumeWheel(wheel) {
+        if (!defaultSink) return;
+        var step = normalVolume * 0.05;
+        if (wheel.angleDelta.y > 0) {
+            defaultSink.volume = Math.min(defaultSink.volume + step, normalVolume);
+            if (defaultSink.muted) defaultSink.muted = false;
+        } else {
+            defaultSink.volume = Math.max(defaultSink.volume - step, 0);
         }
     }
 
@@ -862,11 +912,28 @@ Item {
                 Layout.fillWidth: true
                 spacing: 10
 
-                Kirigami.Icon {
-                    implicitWidth: 14
-                    implicitHeight: 14
-                    source: controlCenterRoot.currentVolumePct === 0 ? "audio-volume-muted" : "audio-volume-high"
-                    color: "#ffffff"
+                Item {
+                    implicitWidth: 16
+                    implicitHeight: 16
+                    Layout.alignment: Qt.AlignVCenter
+
+                    Kirigami.Icon {
+                        anchors.centerIn: parent
+                        implicitWidth: 14
+                        implicitHeight: 14
+                        source: (controlCenterRoot.isMuted || controlCenterRoot.currentVolumePercent === 0)
+                            ? "audio-volume-muted"
+                            : (controlCenterRoot.currentVolumePercent < 50 ? "audio-volume-medium" : "audio-volume-high")
+                        color: "#ffffff"
+                        opacity: controlCenterRoot.isMuted ? 0.5 : 1.0
+                    }
+
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: controlCenterRoot.toggleMute()
+                        onWheel: (wheel) => controlCenterRoot.adjustVolumeWheel(wheel)
+                    }
                 }
 
                 Text {
@@ -895,9 +962,9 @@ Item {
                             anchors.left: parent.left
                             anchors.top: parent.top
                             anchors.bottom: parent.bottom
-                            width: Math.max(7, parent.width * (controlCenterRoot.currentVolumePct / 100))
+                            width: Math.max(7, parent.width * (controlCenterRoot.currentVolumePercent / 100))
                             radius: 3.5
-                            color: "#ffffff"
+                            color: controlCenterRoot.isMuted ? Qt.rgba(1, 1, 1, 0.45) : "#ffffff"
                         }
                     }
 
@@ -942,15 +1009,16 @@ Item {
                             preventStealing = false;
                             isDraggingH = false;
                         }
+                        onWheel: (wheel) => controlCenterRoot.adjustVolumeWheel(wheel)
                     }
                 }
 
                 Text {
-                    text: controlCenterRoot.currentVolumePct + "%"
+                    text: controlCenterRoot.isMuted ? i18n("Mute") : (controlCenterRoot.currentVolumePercent + "%")
                     font.pixelSize: 11
                     font.weight: Font.Bold
                     font.family: "Inter, Roboto, sans-serif"
-                    color: "#ffffff"
+                    color: controlCenterRoot.isMuted ? Qt.rgba(1, 1, 1, 0.55) : "#ffffff"
                     horizontalAlignment: Text.AlignRight
                     Layout.preferredWidth: 38
                 }
