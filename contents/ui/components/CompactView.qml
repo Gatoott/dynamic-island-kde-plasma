@@ -363,6 +363,20 @@ Item {
             lyricsFontBold: compactNotchRoot.cfgLyricsFontBold
             showCompactVisualizer: compactNotchRoot.cfgShowCompactVisualizer
             isPlaying: compactNotchRoot.isPlaying
+
+            miniMusicIconEnabled: compactNotchRoot.miniMusicIconEnabled
+            miniMusicIconSize: compactNotchRoot.miniMusicIconSize
+            miniMusicIconWeight: compactNotchRoot.miniMusicIconWeight
+            miniMusicIconColorMode: compactNotchRoot.miniMusicIconColorMode
+            miniMusicIconCustomColor: compactNotchRoot.miniMusicIconCustomColor
+
+            miniVisBarWidth: compactNotchRoot.miniVisBarWidth
+            miniVisHeight: compactNotchRoot.miniVisHeight
+            miniVisSpacing: compactNotchRoot.miniVisSpacing
+            miniVisColorMode: compactNotchRoot.miniVisColorMode
+            miniVisCustomColor: compactNotchRoot.miniVisCustomColor
+            miniVisAlignment: compactNotchRoot.miniVisAlignment
+            miniVisRounded: compactNotchRoot.miniVisRounded
         }
 
         // State 4: Standby View (Jam & Audio Visualizer)

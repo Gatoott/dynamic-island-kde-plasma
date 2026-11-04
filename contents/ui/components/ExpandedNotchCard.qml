@@ -612,6 +612,20 @@ Item {
                 lyricsFontBold: unifiedNotchRoot.cfgLyricsFontBold
                 showCompactVisualizer: unifiedNotchRoot.cfgShowCompactVisualizer
                 isPlaying: unifiedNotchRoot.isPlaying
+
+                miniMusicIconEnabled: unifiedNotchRoot.miniMusicIconEnabled
+                miniMusicIconSize: unifiedNotchRoot.miniMusicIconSize
+                miniMusicIconWeight: unifiedNotchRoot.miniMusicIconWeight
+                miniMusicIconColorMode: unifiedNotchRoot.miniMusicIconColorMode
+                miniMusicIconCustomColor: unifiedNotchRoot.miniMusicIconCustomColor
+
+                miniVisBarWidth: unifiedNotchRoot.miniVisBarWidth
+                miniVisHeight: unifiedNotchRoot.miniVisHeight
+                miniVisSpacing: unifiedNotchRoot.miniVisSpacing
+                miniVisColorMode: unifiedNotchRoot.miniVisColorMode
+                miniVisCustomColor: unifiedNotchRoot.miniVisCustomColor
+                miniVisAlignment: unifiedNotchRoot.miniVisAlignment
+                miniVisRounded: unifiedNotchRoot.miniVisRounded
             }
 
             // State 4: Standby View (Music Icon, Clock, Visualizer)
