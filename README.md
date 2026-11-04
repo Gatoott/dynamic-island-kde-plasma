@@ -17,11 +17,11 @@
 ## 📽️ Video Preview
 
 <p align="center">
-  <video src="assets/preview.webm" width="100%" controls autoplay loop muted></video>
+  <video src="overview/preview.webm" width="100%" controls autoplay loop muted></video>
 </p>
 
 <p align="center">
-  <sub>🎬 <em>Jika video di atas tidak tampil di aplikasi browser/markdown Anda:</em> <a href="assets/preview.webm"><strong>[Tonton Preview Video Langsung]</strong></a></sub>
+  <sub>🎬 <em>Jika video di atas tidak tampil di aplikasi browser/markdown Anda:</em> <a href="overview/preview.webm"><strong>[Tonton Preview Video Langsung]</strong></a></sub>
 </p>
 
 ---
