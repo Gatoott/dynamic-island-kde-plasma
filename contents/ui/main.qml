@@ -807,26 +807,56 @@ PlasmoidItem {
     property int sysBatteryPct: 100
     property bool sysBatteryCharging: false
 
-    // --- Battery & Power Monitor ---
+    // --- Battery & Power Monitor with State Machine & Debounce Timer ---
     property bool activeBatteryPill: false
     property bool batteryIsCharging: false
-    property int lastPluggedInState: -1
+    property int lastStabilizedPluggedState: -1 // -1 = uninitialized, 0 = unplugged/discharging, 1 = plugged/charging
+    property int pendingPluggedState: -1
 
-    function handleBatteryStateChange(isCharging) {
-        root.sysBatteryCharging = isCharging;
-        root.batteryIsCharging = isCharging;
-        var current = isCharging ? 1 : 0;
-        if (root.lastPluggedInState === -1) {
-            root.lastPluggedInState = current;
-            return;
-        }
-        if (current !== root.lastPluggedInState) {
-            root.lastPluggedInState = current;
-            if (!root.isExpanded) {
-                root.activeBatteryPill = true;
-                batteryDismissTimer.restart();
+    // Debounce Timer (350ms): Menstabilkan fluktuasi sinyal transien ACPI / UPower saat colok/cabut charger
+    Timer {
+        id: powerDebounceTimer
+        interval: 350
+        repeat: false
+        onTriggered: {
+            var rawState = root.getCurrentAcPluggedState();
+            var targetState = (rawState !== -1) ? rawState : root.pendingPluggedState;
+            if (targetState === -1) return;
+
+            // Inisialisasi awal saat login/boot: simpan status awal tanpa memunculkan notifikasi pop-up
+            if (root.lastStabilizedPluggedState === -1) {
+                root.lastStabilizedPluggedState = targetState;
+                root.batteryIsCharging = (targetState === 1);
+                root.sysBatteryCharging = (targetState === 1);
+                return;
+            }
+
+            // HANYA picu notifikasi jika BENAR-BENAR terjadi perubahan status fisik stabil
+            if (targetState !== root.lastStabilizedPluggedState) {
+                root.lastStabilizedPluggedState = targetState;
+                var isCharging = (targetState === 1);
+                root.batteryIsCharging = isCharging;
+                root.sysBatteryCharging = isCharging;
+
+                // Picu notifikasi Dynamic Island (hanya sekali saat terjadi perubahan fisik)
+                if (!root.isExpanded) {
+                    root.activeBatteryPill = true;
+                    batteryDismissTimer.restart();
+                }
             }
         }
+    }
+
+    function queuePowerStateCheck(isPlugged) {
+        root.pendingPluggedState = isPlugged ? 1 : 0;
+        powerDebounceTimer.restart();
+    }
+
+    function getCurrentAcPluggedState() {
+        if (typeof batteryModel !== "undefined" && batteryModel.hasBatteries && batteryModel.pluggedIn !== undefined) {
+            return batteryModel.pluggedIn ? 1 : 0;
+        }
+        return root.pendingPluggedState;
     }
 
     Timer {
@@ -843,24 +873,46 @@ PlasmoidItem {
         id: batteryModel
 
         onPercentChanged: {
+            // MURNI update angka persentase baterai saja, JANGAN PERNAH picu notifikasi di sini
             if (batteryModel.percent !== undefined && batteryModel.percent > 0) {
                 root.sysBatteryPct = batteryModel.percent;
             }
         }
 
         onPluggedInChanged: {
-            root.handleBatteryStateChange(batteryModel.pluggedIn);
+            root.queuePowerStateCheck(batteryModel.pluggedIn);
         }
 
         Component.onCompleted: {
             if (batteryModel.percent !== undefined && batteryModel.percent > 0) {
                 root.sysBatteryPct = batteryModel.percent;
             }
-            root.handleBatteryStateChange(batteryModel.pluggedIn);
+            if (batteryModel.pluggedIn !== undefined) {
+                var initialPlugged = batteryModel.pluggedIn ? 1 : 0;
+                root.lastStabilizedPluggedState = initialPlugged;
+                root.batteryIsCharging = (initialPlugged === 1);
+                root.sysBatteryCharging = (initialPlugged === 1);
+            }
         }
     }
 
-    // 2. UPower DisplayDevice D-Bus Reactive Properties
+    // 2. UPower Daemon D-Bus Watcher (Global AC / OnBattery State)
+    DBus.Properties {
+        id: upowerDaemonProps
+        busType: DBus.BusType.System
+        service: "org.freedesktop.UPower"
+        path: "/org/freedesktop/UPower"
+        iface: "org.freedesktop.UPower"
+
+        onPropertiesChanged: {
+            if (typeof properties !== "undefined" && properties !== null && properties.OnBattery !== undefined) {
+                // OnBattery === false berarti kabel AC tercolok (plugged in)
+                root.queuePowerStateCheck(!properties.OnBattery);
+            }
+        }
+    }
+
+    // 3. UPower DisplayDevice D-Bus Reactive Properties (HANYA untuk persentase baterai)
     DBus.Properties {
         id: upowerDisplayDeviceProps
         busType: DBus.BusType.System
@@ -876,15 +928,11 @@ PlasmoidItem {
                         root.sysBatteryPct = p;
                     }
                 }
-                if (properties.State !== undefined) {
-                    var isCharging = (properties.State === 1);
-                    root.handleBatteryStateChange(isCharging);
-                }
             }
         }
     }
 
-    // 3. Periodic Polling & D-Bus Fallback (interval 6000ms)
+    // 4. Periodic Polling & D-Bus Fallback (interval 6000ms - HANYA update angka pasif)
     DBusCall {
         id: dbusBatteryGet
         busType: DBus.BusType.System
@@ -899,7 +947,7 @@ PlasmoidItem {
         interval: 6000
         running: true
         repeat: true
-        triggeredOnStart: true
+        triggeredOnStart: false
         onTriggered: {
             root.refreshBatteryStatus();
         }
@@ -908,21 +956,12 @@ PlasmoidItem {
     function refreshBatteryStatus() {
         if (typeof batteryModel !== "undefined" && batteryModel.hasBatteries && batteryModel.percent !== undefined && batteryModel.percent > 0) {
             root.sysBatteryPct = batteryModel.percent;
-            root.handleBatteryStateChange(batteryModel.pluggedIn);
         }
         dbusBatteryGet.call("Get", ["org.freedesktop.UPower.Device", "Percentage"], (reply) => {
             if (reply && reply.value !== undefined) {
                 var p = Math.round(reply.value);
                 if (!isNaN(p) && p > 0) {
                     root.sysBatteryPct = p;
-                }
-            }
-        });
-        dbusBatteryGet.call("Get", ["org.freedesktop.UPower.Device", "State"], (reply) => {
-            if (reply && reply.value !== undefined) {
-                var st = parseInt(reply.value);
-                if (!isNaN(st)) {
-                    root.handleBatteryStateChange(st === 1);
                 }
             }
         });
