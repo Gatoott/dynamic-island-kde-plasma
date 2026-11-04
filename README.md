@@ -335,5 +335,5 @@ journalctl --user -u plasma-plasmashell.service -f
 ---
 
 <p align="center">
-  Dibuat dengan vibe coding ❤️ untuk komunitas KDE Plasma Linux.
+  Dibuat dengan vibe coding ❤️
 </p>
