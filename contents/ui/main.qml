@@ -73,7 +73,7 @@ PlasmoidItem {
     readonly property bool cfgShowCompactVisualizer: Plasmoid.configuration.showCompactVisualizer !== undefined ? Plasmoid.configuration.showCompactVisualizer : false
     readonly property bool cfgAutoRetryLyrics: Plasmoid.configuration.autoRetryLyrics !== undefined ? Plasmoid.configuration.autoRetryLyrics : true
     readonly property int cfgExpandedBgStyle: Plasmoid.configuration.expandedBgStyle !== undefined ? Plasmoid.configuration.expandedBgStyle : 0
-    readonly property int cfgMediaCardBgMode: Plasmoid.configuration.mediaCardBgMode !== undefined ? Plasmoid.configuration.mediaCardBgMode : 0
+    readonly property int cfgMediaCardBgMode: Plasmoid.configuration.mediaBgStyle !== undefined ? Plasmoid.configuration.mediaBgStyle : (Plasmoid.configuration.mediaCardBgMode !== undefined ? Plasmoid.configuration.mediaCardBgMode : 2)
     readonly property int cfgLyricsBgMode: Plasmoid.configuration.lyricsBgMode !== undefined ? Plasmoid.configuration.lyricsBgMode : 1
 
     // Mini Music Icon (Left of Clock) Customization
@@ -1078,6 +1078,10 @@ PlasmoidItem {
         openNotch(targetTabIndex);
     }
 
+    function closeNotch() {
+        triggerCollapseSequence();
+    }
+
     function collapseNotch() {
         triggerCollapseSequence();
     }
@@ -1288,6 +1292,20 @@ PlasmoidItem {
                 cfgShowVisualizer: root.cfgShowVisualizer
                 cfgShowCompactVisualizer: root.cfgShowCompactVisualizer
                 albumDominantColor: root.albumDominantColor
+
+                miniVisBarWidth: root.cfgMiniVisBarWidth
+                miniVisHeight: root.cfgMiniVisHeight
+                miniVisSpacing: root.cfgMiniVisSpacing
+                miniVisColorMode: root.cfgMiniVisColorMode
+                miniVisCustomColor: root.cfgMiniVisCustomColor
+                miniVisAlignment: root.cfgMiniVisAlignment
+                miniVisRounded: root.cfgMiniVisRounded
+
+                miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
+                miniMusicIconSize: root.cfgMiniMusicIconSize
+                miniMusicIconWeight: root.cfgMiniMusicIconWeight
+                miniMusicIconColorMode: root.cfgMiniMusicIconColorMode
+                miniMusicIconCustomColor: root.cfgMiniMusicIconCustomColor
 
                 sysCpuPct: root.sysCpuPct
                 sysTemp: root.sysTemp

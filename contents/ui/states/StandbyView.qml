@@ -16,72 +16,42 @@ Item {
     property string clockFontFamily: ""
     property bool clockFontBold: true
     property bool showVisualizer: true
-    property int miniVisBarWidth: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisBarWidth !== undefined) return plasmoid.configuration.miniVisBarWidth;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisBarWidth !== undefined) return Plasmoid.configuration.miniVisBarWidth;
-        return 2;
-    }
-    property int miniVisHeight: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration) {
-            if (plasmoid.configuration.miniVisHeight !== undefined) return plasmoid.configuration.miniVisHeight;
-            if (plasmoid.configuration.miniVisMaxHeight !== undefined) return plasmoid.configuration.miniVisMaxHeight;
-        }
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration) {
-            if (Plasmoid.configuration.miniVisHeight !== undefined) return Plasmoid.configuration.miniVisHeight;
-            if (Plasmoid.configuration.miniVisMaxHeight !== undefined) return Plasmoid.configuration.miniVisMaxHeight;
-        }
-        return 14;
-    }
-    property int miniVisSpacing: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisSpacing !== undefined) return plasmoid.configuration.miniVisSpacing;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisSpacing !== undefined) return Plasmoid.configuration.miniVisSpacing;
-        return 2;
-    }
-    property int miniVisColorMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisColorMode !== undefined) return plasmoid.configuration.miniVisColorMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisColorMode !== undefined) return Plasmoid.configuration.miniVisColorMode;
-        return 0;
-    }
-    property color miniVisCustomColor: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisCustomColor) return plasmoid.configuration.miniVisCustomColor;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisCustomColor) return Plasmoid.configuration.miniVisCustomColor;
-        return Qt.color("#38bdf8");
-    }
-    property int miniVisAlignment: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisAlignment !== undefined) return plasmoid.configuration.miniVisAlignment;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisAlignment !== undefined) return Plasmoid.configuration.miniVisAlignment;
-        return 1;
-    }
-    property bool miniVisRounded: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniVisRounded !== undefined) return plasmoid.configuration.miniVisRounded;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniVisRounded !== undefined) return Plasmoid.configuration.miniVisRounded;
-        return true;
-    }
+    readonly property var plasmoidConfig: (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration) 
+        ? plasmoid.configuration 
+        : ((typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration) ? Plasmoid.configuration : null)
+
+    property int miniVisBarWidth: (plasmoidConfig && plasmoidConfig.miniVisBarWidth !== undefined) ? plasmoidConfig.miniVisBarWidth : 2
+    property int miniVisHeight: (plasmoidConfig && (plasmoidConfig.miniVisHeight !== undefined || plasmoidConfig.miniVisMaxHeight !== undefined)) ? (plasmoidConfig.miniVisHeight !== undefined ? plasmoidConfig.miniVisHeight : plasmoidConfig.miniVisMaxHeight) : 14
+    property int miniVisSpacing: (plasmoidConfig && plasmoidConfig.miniVisSpacing !== undefined) ? plasmoidConfig.miniVisSpacing : 2
+    property int miniVisColorMode: (plasmoidConfig && plasmoidConfig.miniVisColorMode !== undefined) ? plasmoidConfig.miniVisColorMode : 0
+    property color miniVisCustomColor: (plasmoidConfig && plasmoidConfig.miniVisCustomColor) ? Qt.color(plasmoidConfig.miniVisCustomColor) : Qt.color("#38bdf8")
+    property int miniVisAlignment: (plasmoidConfig && plasmoidConfig.miniVisAlignment !== undefined) ? plasmoidConfig.miniVisAlignment : 1
+    property bool miniVisRounded: (plasmoidConfig && plasmoidConfig.miniVisRounded !== undefined) ? plasmoidConfig.miniVisRounded : true
 
     // Mini Music Icon (Left of Clock) Customization
     property bool miniMusicIconEnabled: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
         return true;
     }
     property int miniMusicIconSize: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
         return 13;
     }
     property int miniMusicIconWeight: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
         return 600;
     }
     property int miniMusicIconColorMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
         return 0;
     }
     property color miniMusicIconCustomColor: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return plasmoid.configuration.miniMusicIconCustomColor;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Plasmoid.configuration.miniMusicIconCustomColor;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(plasmoid.configuration.miniMusicIconCustomColor);
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(Plasmoid.configuration.miniMusicIconCustomColor);
         return Qt.color("#ffffff");
     }
 
@@ -96,26 +66,69 @@ Item {
         Text {
             id: musicNoteIcon
             text: "♫"
-            visible: standbyRoot.miniMusicIconEnabled && standbyRoot.isPlaying
-            font.pixelSize: standbyRoot.miniMusicIconSize
-            font.weight: standbyRoot.miniMusicIconWeight
+            visible: {
+                var en = true;
+                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) {
+                    en = plasmoid.configuration.miniMusicIconEnabled;
+                } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) {
+                    en = Plasmoid.configuration.miniMusicIconEnabled;
+                } else {
+                    en = standbyRoot.miniMusicIconEnabled;
+                }
+                return en && standbyRoot.isPlaying;
+            }
+            font.pixelSize: {
+                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) {
+                    return plasmoid.configuration.miniMusicIconSize;
+                }
+                if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) {
+                    return Plasmoid.configuration.miniMusicIconSize;
+                }
+                return (standbyRoot.miniMusicIconSize !== undefined) ? standbyRoot.miniMusicIconSize : 13;
+            }
+            font.weight: {
+                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) {
+                    return plasmoid.configuration.miniMusicIconWeight;
+                }
+                if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) {
+                    return Plasmoid.configuration.miniMusicIconWeight;
+                }
+                return (standbyRoot.miniMusicIconWeight !== undefined) ? standbyRoot.miniMusicIconWeight : 600;
+            }
             verticalAlignment: Text.AlignVCenter
             Layout.alignment: Qt.AlignVCenter
 
             // Logika Warna Dinamis:
             color: {
-                switch (standbyRoot.miniMusicIconColorMode) {
-                    case 0:
+                var cMode = 0;
+                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) {
+                    cMode = plasmoid.configuration.miniMusicIconColorMode;
+                } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) {
+                    cMode = Plasmoid.configuration.miniMusicIconColorMode;
+                } else {
+                    cMode = standbyRoot.miniMusicIconColorMode;
+                }
+
+                switch (cMode) {
+                    case 0: // Warna cover album dinamis
                         if (standbyRoot.albumColor && standbyRoot.albumColor != "" && standbyRoot.albumColor != "#000000" && standbyRoot.albumColor != "transparent") {
                             return standbyRoot.albumColor;
                         }
                         return standbyRoot.accentColor || "#ffffff";
-                    case 1:
+                    case 1: // Aksen sistem KDE
                         return Kirigami.Theme.highlightColor;
-                    case 2:
+                    case 2: // Putih / Abu redup
                         return Qt.rgba(1, 1, 1, 0.75);
-                    case 3:
-                        return standbyRoot.miniMusicIconCustomColor;
+                    case 3: // Warna kustom dari color picker
+                        var cust = null;
+                        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) {
+                            cust = plasmoid.configuration.miniMusicIconCustomColor;
+                        } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) {
+                            cust = Plasmoid.configuration.miniMusicIconCustomColor;
+                        } else {
+                            cust = standbyRoot.miniMusicIconCustomColor;
+                        }
+                        return cust ? Qt.color(cust) : "#ffffff";
                     default:
                         return "#ffffff";
                 }

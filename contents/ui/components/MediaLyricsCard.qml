@@ -27,10 +27,17 @@ Item {
     property string clockFontFamily: ""
 
     property int mediaCardBgMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
-        return 0;
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration) {
+            if (plasmoid.configuration.mediaBgStyle !== undefined) return plasmoid.configuration.mediaBgStyle;
+            if (plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
+        }
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration) {
+            if (Plasmoid.configuration.mediaBgStyle !== undefined) return Plasmoid.configuration.mediaBgStyle;
+            if (Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
+        }
+        return 2;
     }
+    readonly property color currentAlbumColor: (albumDominantColor !== undefined && albumDominantColor != "" && albumDominantColor != "transparent") ? albumDominantColor : Qt.color("#3daee9")
     property int expandedBgStyle: {
         if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.expandedBgStyle !== undefined) return plasmoid.configuration.expandedBgStyle;
         if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.expandedBgStyle !== undefined) return Plasmoid.configuration.expandedBgStyle;
@@ -216,21 +223,22 @@ Item {
         bottomRightRadius: 22
         clip: true
 
-        // Mode 0: Adaptive Album Tint (base color selaras dengan bodi dan sayap notch)
-        // Mode 1: Glassy Translucent (Qt.rgba(0.08, 0.08, 0.12, 0.65))
-        // Mode 2: Pure Pitch Dark (#09090b)
+        // Mode 0: Pure Dark (#09090b)
+        // Mode 1: Full Adaptive Tint (base color selaras dengan rona album)
+        // Mode 2: Album Bottom Gradient (Atas #09090b -> Bawah Warna Cover Album)
+        // Mode 3: Glassy Acrylic Blur / Translucent (Qt.rgba(0.08, 0.08, 0.12, 0.65))
         color: {
             if (mediaCardRoot.showLyrics) {
                 return "#09090b";
             }
-            if (mediaCardRoot.mediaCardBgMode === 1) {
+            if (mediaCardRoot.mediaCardBgMode === 3) {
                 return Qt.rgba(0.08, 0.08, 0.12, 0.65);
-            } else if (mediaCardRoot.mediaCardBgMode === 2) {
-                return "#09090b";
-            } else {
+            } else if (mediaCardRoot.mediaCardBgMode === 1) {
                 return (mediaCardRoot.albumArtUrl !== "")
-                    ? Qt.darker(mediaCardRoot.albumDominantColor || "#121214", 2.5)
+                    ? Qt.darker(mediaCardRoot.currentAlbumColor, 2.5)
                     : "#09090b";
+            } else {
+                return "#09090b";
             }
         }
         Behavior on color { ColorAnimation { duration: 300 } }
@@ -238,10 +246,10 @@ Item {
         // Inner border highlight untuk efek glassy kaca (ditiadakan agar sisi samping & bawah bersih)
         border.width: 0
 
-        // Mode 0 Media Player: Rona Adaptif Gradien dari Album Cover (Pusat Cahaya Album Art)
+        // Mode 1 Media Player: Rona Adaptif Gradien dari Album Cover (Pusat Cahaya Album Art)
         Shape {
             anchors.fill: parent
-            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0 && mediaCardRoot.albumArtUrl !== ""
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 1 && mediaCardRoot.albumArtUrl !== ""
             layer.enabled: visible
             layer.samples: 4
             opacity: 0.75
@@ -278,10 +286,10 @@ Item {
             }
         }
 
-        // Mode 0 Ambient Bottom Blend: Mengalirkan gradasi halus rona album ke seluruh lengkungan bawah (Anti-Bocor Sudut)
+        // Mode 1 Ambient Bottom Blend: Mengalirkan gradasi halus rona album ke seluruh lengkungan bawah (Anti-Bocor Sudut)
         Rectangle {
             anchors.fill: parent
-            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 0 && mediaCardRoot.albumArtUrl !== ""
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 1 && mediaCardRoot.albumArtUrl !== ""
             topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
             topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
             bottomLeftRadius: 22
@@ -290,6 +298,36 @@ Item {
                 GradientStop { position: 0.0; color: "transparent" }
                 GradientStop { position: 0.40; color: "transparent" }
                 GradientStop { position: 1.0; color: Qt.rgba(mediaCardRoot.albumDominantColor.r, mediaCardRoot.albumDominantColor.g, mediaCardRoot.albumDominantColor.b, 0.22) }
+            }
+        }
+
+        // Mode 2 Media Player: Layer Gradasi Vertikal (Atas Hitam Pekat -> Bawah Warna Cover Album)
+        Rectangle {
+            id: bottomGradientLayer
+            anchors.fill: parent
+            visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 2 && mediaCardRoot.albumArtUrl !== ""
+            topLeftRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            topRightRadius: mediaCardRoot.isFloatingStyle ? 22 : 0
+            bottomLeftRadius: 22
+            bottomRightRadius: 22
+            clip: true
+
+            gradient: Gradient {
+                // Posisi 0.0 (Paling Atas): Hitam pekat agar menyatu dengan notch/panel
+                GradientStop { 
+                    position: 0.0 
+                    color: "#09090b" 
+                }
+                // Transisi halus di tengah
+                GradientStop { 
+                    position: 0.45 
+                    color: Qt.darker(mediaCardRoot.currentAlbumColor, 2.4) 
+                }
+                // Posisi 1.0 (Paling Bawah): Warna cover album aktif
+                GradientStop { 
+                    position: 1.0 
+                    color: Qt.rgba(mediaCardRoot.currentAlbumColor.r, mediaCardRoot.currentAlbumColor.g, mediaCardRoot.currentAlbumColor.b, 0.75) 
+                }
             }
         }
 

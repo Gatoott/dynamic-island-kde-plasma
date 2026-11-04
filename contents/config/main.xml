@@ -63,9 +63,12 @@
     <entry name="expandedBgStyle" type="Int">
       <default>0</default>
     </entry>
-    <!-- Gaya Background Khusus Tab Media Player: 0 = Adaptive Album Tint, 1 = Glassy Blur, 2 = Pitch Dark Solid -->
+    <!-- Gaya Background Khusus Tab Media Player: 0 = Pure Dark, 1 = Full Adaptive Tint, 2 = Album Bottom Gradient, 3 = Acrylic Blur / Liquid Glass -->
+    <entry name="mediaBgStyle" type="Int">
+      <default>2</default>
+    </entry>
     <entry name="mediaCardBgMode" type="Int">
-      <default>0</default>
+      <default>2</default>
     </entry>
     <!-- Gaya Background Khusus Mode Lirik: 0 = Pure Dark Solid, 1 = Bottom Album Tint -->
     <entry name="lyricsBgMode" type="Int">

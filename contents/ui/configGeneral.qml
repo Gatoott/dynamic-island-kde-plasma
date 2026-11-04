@@ -26,6 +26,7 @@ KCM.SimpleKCM {
     property alias cfg_enableBlur: enableBlurSwitch.checked
     property alias cfg_expandedBgStyle: expandedBgStyleCombo.currentIndex
     property alias cfg_mediaCardBgMode: mediaCardBgModeCombo.currentIndex
+    property alias cfg_mediaBgStyle: mediaCardBgModeCombo.currentIndex
     property alias cfg_lyricsBgMode: lyricsBgModeCombo.currentIndex
 
     QQC2.TextField {
@@ -629,11 +630,12 @@ KCM.SimpleKCM {
             QQC2.ComboBox {
                 id: mediaCardBgModeCombo
                 model: [
-                    i18n("Warna Adaptif Album Cover (Adaptive Tint)"),
-                    i18n("Glassy Acrylic Blur (macOS Style)"),
-                    i18n("Hitam Pekat Minimalis / Pure Dark")
+                    i18n("Pure Dark (Hitam Pekat)"),
+                    i18n("Warna Album Penuh (Full Tint)"),
+                    i18n("Gradasi Album (Atas Hitam -> Bawah Album)"),
+                    i18n("Liquid Glass / Blur")
                 ]
-                Layout.preferredWidth: 260
+                Layout.preferredWidth: 280
             }
         }
 

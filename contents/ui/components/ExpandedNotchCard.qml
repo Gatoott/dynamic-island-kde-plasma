@@ -59,9 +59,15 @@ Item {
         return 0;
     }
     property int mediaCardBgMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
-        return 0;
+        if (typeof plasmoid !== "undefined" && plasmoid.configuration) {
+            if (plasmoid.configuration.mediaBgStyle !== undefined) return plasmoid.configuration.mediaBgStyle;
+            if (plasmoid.configuration.mediaCardBgMode !== undefined) return plasmoid.configuration.mediaCardBgMode;
+        }
+        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration) {
+            if (Plasmoid.configuration.mediaBgStyle !== undefined) return Plasmoid.configuration.mediaBgStyle;
+            if (Plasmoid.configuration.mediaCardBgMode !== undefined) return Plasmoid.configuration.mediaCardBgMode;
+        }
+        return 2;
     }
     property int lyricsBgMode: {
         if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.lyricsBgMode !== undefined) return plasmoid.configuration.lyricsBgMode;
@@ -78,11 +84,13 @@ Item {
     readonly property bool isAdaptiveTintActive: {
         if (expandedBgMode === 1) return true;
         if (expandedBgMode === 0) return false;
-        return (activeTabKey === "media" && mediaCardBgMode === 0 && !showLyrics);
+        // In new indexing: 0 = Pure Dark, 1 = Full Adaptive Tint, 2 = Album Bottom Gradient, 3 = Acrylic Blur
+        // Only mode 1 tints the upper body and wings of the notch. Mode 2 keeps top wings at #09090b.
+        return (activeTabKey === "media" && mediaCardBgMode === 1 && !showLyrics);
     }
 
     readonly property color cardBackgroundColor: {
-        if (expandedBgStyle === 1) {
+        if (expandedBgStyle === 1 || (activeTabKey === "media" && mediaCardBgMode === 3)) {
             return Qt.rgba(0.06, 0.06, 0.08, 0.72);
         }
         if (isExpanded && isAdaptiveTintActive && hasActiveAlbumColor) {
@@ -164,30 +172,34 @@ Item {
         return true;
     }
 
+    readonly property var plasmoidConfig: (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration) 
+        ? plasmoid.configuration 
+        : ((typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration) ? Plasmoid.configuration : null)
+
     // Mini Music Icon (Left of Clock) Customization
     property bool miniMusicIconEnabled: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
         return true;
     }
     property int miniMusicIconSize: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
         return 13;
     }
     property int miniMusicIconWeight: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
         return 600;
     }
     property int miniMusicIconColorMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
         return 0;
     }
     property color miniMusicIconCustomColor: {
-        if (typeof plasmoid !== "undefined" && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return plasmoid.configuration.miniMusicIconCustomColor;
-        if (typeof Plasmoid !== "undefined" && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Plasmoid.configuration.miniMusicIconCustomColor;
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(plasmoid.configuration.miniMusicIconCustomColor);
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(Plasmoid.configuration.miniMusicIconCustomColor);
         return Qt.color("#ffffff");
     }
 
@@ -716,6 +728,16 @@ Item {
                             if (mediaIdx !== -1) {
                                 unifiedNotchRoot.requestSwitchTab(mediaIdx);
                             }
+                        }
+                        onRequestOpenSettings: {
+                            if (typeof plasmoid !== "undefined" && plasmoid.action && plasmoid.action("configure")) {
+                                plasmoid.action("configure").trigger();
+                            } else if (typeof Plasmoid !== "undefined" && Plasmoid.action && Plasmoid.action("configure")) {
+                                Plasmoid.action("configure").trigger();
+                            }
+                            Qt.callLater(() => {
+                                unifiedNotchRoot.requestClose();
+                            });
                         }
                     }
                 }

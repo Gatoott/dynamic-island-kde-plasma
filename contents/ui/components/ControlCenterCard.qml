@@ -770,43 +770,23 @@ Item {
         }
 
         // ---------------------------------------------------------
-        // 3. Quick Action Icons Row (5 Circular Buttons)
+        // 3. Quick Action Icons Row (Centered Circular Buttons)
         // ---------------------------------------------------------
         RowLayout {
-            Layout.fillWidth: true
+            Layout.alignment: Qt.AlignHCenter
             Layout.preferredHeight: 38
-            spacing: 10
+            spacing: 12
 
-            // 1. Dark Mode Toggle
+            // 1. Do Not Disturb / Notifications Toggle
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
                 radius: 18
-                color: dndMa1.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
-
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    width: 16
-                    height: 16
-                    source: "weather-clear-night"
-                    color: "#ffffff"
-                }
-
-                MouseArea {
-                    id: dndMa1
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: controlCenterRoot.toggleDarkMode()
-                }
-            }
-
-            // 2. Do Not Disturb Toggle
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                radius: 18
-                color: controlCenterRoot.dndActive ? Qt.rgba(255/255, 59/255, 48/255, 0.4) : (dndMa2.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1))
+                color: controlCenterRoot.dndActive 
+                    ? Qt.rgba(255/255, 59/255, 48/255, 0.4) 
+                    : (dndMa.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.10))
+                border.width: 1
+                border.color: controlCenterRoot.dndActive ? "#ff453a" : Qt.rgba(1, 1, 1, 0.08)
 
                 Kirigami.Icon {
                     anchors.centerIn: parent
@@ -817,7 +797,7 @@ Item {
                 }
 
                 MouseArea {
-                    id: dndMa2
+                    id: dndMa
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -825,36 +805,15 @@ Item {
                 }
             }
 
-            // 3. App Grid / Launcher
+            // 2. Dynamic Island Settings (Gear Icon)
             Rectangle {
-                Layout.fillWidth: true
+                id: settingsButton
+                Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
                 radius: 18
-                color: dndMa3.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
-
-                Kirigami.Icon {
-                    anchors.centerIn: parent
-                    width: 16
-                    height: 16
-                    source: "applications-all"
-                    color: "#ffffff"
-                }
-
-                MouseArea {
-                    id: dndMa3
-                    anchors.fill: parent
-                    hoverEnabled: true
-                    cursorShape: Qt.PointingHandCursor
-                    onClicked: controlCenterRoot.requestOpenLauncher()
-                }
-            }
-
-            // 4. System Settings
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 36
-                radius: 18
-                color: dndMa4.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.1)
+                color: settingsMa.containsMouse ? Qt.rgba(1, 1, 1, 0.22) : Qt.rgba(1, 1, 1, 0.10)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.08)
 
                 Kirigami.Icon {
                     anchors.centerIn: parent
@@ -865,20 +824,50 @@ Item {
                 }
 
                 MouseArea {
-                    id: dndMa4
+                    id: settingsMa
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: controlCenterRoot.requestOpenSettings()
+                    onClicked: {
+                        // 1. Cari objek plasmoid yang valid (dari root atau parent tree)
+                        var targetPlasmoid = (typeof plasmoid !== "undefined" && plasmoid) 
+                            ? plasmoid 
+                            : ((typeof Plasmoid !== "undefined" && Plasmoid) 
+                                ? Plasmoid 
+                                : ((typeof root !== "undefined" && root.plasmoid) ? root.plasmoid : null));
+
+                        if (targetPlasmoid) {
+                            var configAction = (typeof targetPlasmoid.action === "function") ? targetPlasmoid.action("configure") : null;
+                            if (configAction) {
+                                configAction.trigger();
+                            } else if (typeof targetPlasmoid.internalAction === "function") {
+                                var internalConfig = targetPlasmoid.internalAction("configure");
+                                if (internalConfig) internalConfig.trigger();
+                            }
+                        }
+
+                        // 2. Tutup kartu notch di tick berikutnya agar dialog pengaturan tidak ter-abort oleh unmap surface
+                        Qt.callLater(() => {
+                            if (typeof root !== "undefined" && typeof root.closeNotch === "function") {
+                                root.closeNotch();
+                            } else if (typeof root !== "undefined" && typeof root.triggerCollapseSequence === "function") {
+                                root.triggerCollapseSequence();
+                            } else {
+                                controlCenterRoot.requestOpenSettings();
+                            }
+                        });
+                    }
                 }
             }
 
-            // 5. Power Shutdown
+            // 3. Power / Session Shutdown
             Rectangle {
-                Layout.fillWidth: true
+                Layout.preferredWidth: 36
                 Layout.preferredHeight: 36
                 radius: 18
-                color: dndMa5.containsMouse ? Qt.rgba(255/255, 59/255, 48/255, 0.5) : Qt.rgba(1, 1, 1, 0.1)
+                color: powerMa.containsMouse ? Qt.rgba(255/255, 59/255, 48/255, 0.5) : Qt.rgba(1, 1, 1, 0.10)
+                border.width: 1
+                border.color: Qt.rgba(1, 1, 1, 0.08)
 
                 Kirigami.Icon {
                     anchors.centerIn: parent
@@ -889,7 +878,7 @@ Item {
                 }
 
                 MouseArea {
-                    id: dndMa5
+                    id: powerMa
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
@@ -932,7 +921,6 @@ Item {
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         onClicked: controlCenterRoot.toggleMute()
-                        onWheel: (wheel) => controlCenterRoot.adjustVolumeWheel(wheel)
                     }
                 }
 
@@ -1009,7 +997,6 @@ Item {
                             preventStealing = false;
                             isDraggingH = false;
                         }
-                        onWheel: (wheel) => controlCenterRoot.adjustVolumeWheel(wheel)
                     }
                 }
 
