@@ -145,7 +145,7 @@ Item {
     }
 
     // ==============================================================
-    // 1A. SILUET FLOATING CAPSULE (Tanpa Lekukan Sayap Atas)
+    // 1A. SILUET FLOATING CAPSULE (Tanpa Lekukan Sayap Atas - Borderless)
     // ==============================================================
     Rectangle {
         id: floatingPillBody
@@ -153,23 +153,13 @@ Item {
         anchors.fill: parent
         radius: height / 2 // Kapsul membulat penuh sempurna
         color: compactNotchRoot.cfgBgColor.a > 0 ? compactNotchRoot.cfgBgColor : "#0b0b0f"
-        border.width: 1
-        border.color: compactNotchRoot.cfgBorderColor.a > 0 ? compactNotchRoot.cfgBorderColor : Qt.rgba(1, 1, 1, 0.12)
+        border.width: 0
+        border.color: "transparent"
         clip: true
-
-        // Inner subtle rim highlight
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: 1
-            radius: Math.max(0, (parent.height / 2) - 1)
-            color: "transparent"
-            border.width: 1
-            border.color: Qt.rgba(1, 1, 1, 0.08)
-        }
     }
 
     // ==============================================================
-    // 1B. SILUET LIVING NOTCH (PathCubic Inverted Fillet Sayap Nempel Atas)
+    // 1B. SILUET LIVING NOTCH (PathCubic Inverted Fillet Sayap Nempel Atas - Borderless)
     // ==============================================================
     Shape {
         id: compactSilhouette
@@ -178,76 +168,10 @@ Item {
         layer.enabled: true
         layer.samples: 4
 
-        // 1A. Aksen Dark Glow Minimalis Mengitari Siluet
+        // Siluet Bodi Tunggal Living Notch (Border & Stroke dimatikan agar borderless dan menyatu mulus dengan panel)
         ShapePath {
-            strokeColor: Qt.rgba(0.2, 0.45, 0.85, 0.28)
-            strokeWidth: 3
-            fillColor: "transparent"
-
-            startX: 0
-            startY: 0
-
-            // Lekukan CEKUNG sayap kiri
-            PathCubic {
-                x: compactNotchRoot.wingR
-                y: compactNotchRoot.wingR
-                control1X: compactNotchRoot.wingR * 0.55
-                control1Y: 0
-                control2X: compactNotchRoot.wingR
-                control2Y: compactNotchRoot.wingR * 0.45
-            }
-
-            // Dinding vertikal kiri
-            PathLine {
-                x: compactNotchRoot.wingR
-                y: compactNotchRoot.notchH - compactNotchRoot.cornerR
-            }
-
-            // Sudut cembung kiri bawah
-            PathArc {
-                x: compactNotchRoot.wingR + compactNotchRoot.cornerR
-                y: compactNotchRoot.notchH
-                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
-                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
-                direction: PathArc.Counterclockwise
-            }
-
-            // Garis horizontal dasar notch
-            PathLine {
-                x: compactNotchRoot.width - compactNotchRoot.wingR - compactNotchRoot.cornerR
-                y: compactNotchRoot.notchH
-            }
-
-            // Sudut cembung kanan bawah
-            PathArc {
-                x: compactNotchRoot.width - compactNotchRoot.wingR
-                y: compactNotchRoot.notchH - compactNotchRoot.cornerR
-                radiusX: Math.max(0.1, compactNotchRoot.cornerR)
-                radiusY: Math.max(0.1, compactNotchRoot.cornerR)
-                direction: PathArc.Counterclockwise
-            }
-
-            // Dinding vertikal kanan
-            PathLine {
-                x: compactNotchRoot.width - compactNotchRoot.wingR
-                y: compactNotchRoot.wingR
-            }
-
-            // Lekukan CEKUNG sayap kanan
-            PathCubic {
-                x: compactNotchRoot.width
-                y: 0
-                control1X: compactNotchRoot.width - compactNotchRoot.wingR
-                control1Y: compactNotchRoot.wingR * 0.45
-                control2X: compactNotchRoot.width - (compactNotchRoot.wingR * 0.55)
-                control2Y: 0
-            }
-        }
-
-        // 1B. Siluet Bodi + 1px Outline Semi-Transparan
-        ShapePath {
-            strokeColor: compactNotchRoot.cfgBorderColor
-            strokeWidth: 1
+            strokeColor: "transparent"
+            strokeWidth: 0
             fillColor: compactNotchRoot.cfgBgColor
 
             startX: 0
