@@ -1188,7 +1188,7 @@ PlasmoidItem {
         height: root.cfgCompactHeight
 
         anchors.top: parent.top
-        anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
+        anchors.topMargin: root.effectiveVerticalOffset
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
