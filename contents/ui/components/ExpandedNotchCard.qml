@@ -279,12 +279,22 @@ Item {
     readonly property real wingRadius: cfgNotchWingRadius
     readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
     property real cornerRadius: (isExpanded && !isClosing) ? 22 : cfgNotchBottomRadius
-    Behavior on cornerRadius { NumberAnimation { duration: 200 } }
+    Behavior on cornerRadius {
+        enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
+        NumberAnimation {
+            duration: 200
+            easing.type: Easing.OutQuad
+        }
+    }
 
     // Tetapkan satu nilai tinggi & lebar tetap (Uniform Dimensions):
     readonly property real standardCardHeight: 180
     readonly property real standardCardWidth: getTargetWidthForTab(currentExpandedTab, showLyrics)
     property alias expandedContentArea: expandedContent
+
+    // Simpan dimensi awal saat transisi morphing
+    property real animStartW: compactWidth
+    property real animStartH: compactHeight
 
     // Pemetaan Dimensi Eksplisit Tiap Tab (Anti-NaN & Anti-Squish)
     function getTargetWidthForTab(tabIndex, lyricsActive) {
@@ -331,28 +341,35 @@ Item {
     ParallelAnimation {
         id: closeSequenceAnimation
 
-        // 1. Fade out konten secara cepat (80ms)
+        // 1. Fade out konten secara cepat (70ms) agar bersih
         NumberAnimation {
             target: expandedContent
             property: "opacity"
             to: 0.0
-            duration: 80
+            duration: 70
             easing.type: Easing.OutQuad
         }
 
-        // 2. Susutkan dimensi kartu ke ukuran compactWidth & compactHeight (180ms)
+        // 2. Susutkan bodi kartu ke ukuran standby pill (220ms)
         NumberAnimation {
             target: unifiedNotchRoot
             property: "targetW"
             to: unifiedNotchRoot.compactWidth
-            duration: 180
+            duration: 220
             easing.type: Easing.InOutCubic
         }
         NumberAnimation {
             target: unifiedNotchRoot
             property: "targetH"
             to: unifiedNotchRoot.compactHeight
-            duration: 180
+            duration: 220
+            easing.type: Easing.InOutCubic
+        }
+        NumberAnimation {
+            target: unifiedNotchRoot
+            property: "cornerRadius"
+            to: unifiedNotchRoot.cfgNotchBottomRadius
+            duration: 220
             easing.type: Easing.InOutCubic
         }
 
@@ -360,42 +377,53 @@ Item {
             unifiedNotchRoot.isClosing = false;
             unifiedNotchRoot.collapseCompleted();
             unifiedNotchRoot.collapseFinished();
-            Qt.callLater(function() {
-                expandedContent.opacity = 1.0;
-            });
         }
     }
 
     // -------------------------------------------------------------
-    // TRANSISI PEMBUKAAN ATOMIK
+    // TRANSISI PEMBUKAAN ATOMIK (Morphing Mulus & Terpadu)
     // -------------------------------------------------------------
     ParallelAnimation {
         id: openSequenceAnimation
 
-        NumberAnimation {
-            target: unifiedNotchRoot
-            property: "targetW"
-            from: unifiedNotchRoot.compactWidth
-            to: unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics)
-            duration: 200
-            easing.type: Easing.OutCubic
-        }
-        NumberAnimation {
-            target: unifiedNotchRoot
-            property: "targetH"
-            from: unifiedNotchRoot.compactHeight
-            to: unifiedNotchRoot.standardCardHeight
-            duration: 200
-            easing.type: Easing.OutCubic
-        }
         SequentialAnimation {
-            PauseAnimation { duration: 30 }
+            PauseAnimation { duration: 16 } // 1-2 frame agar window buffer terkomit rapi di Wayland
+            ParallelAnimation {
+                NumberAnimation {
+                    target: unifiedNotchRoot
+                    property: "targetW"
+                    from: unifiedNotchRoot.animStartW
+                    to: unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics)
+                    duration: 280
+                    easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    target: unifiedNotchRoot
+                    property: "targetH"
+                    from: unifiedNotchRoot.animStartH
+                    to: unifiedNotchRoot.standardCardHeight
+                    duration: 280
+                    easing.type: Easing.OutCubic
+                }
+                NumberAnimation {
+                    target: unifiedNotchRoot
+                    property: "cornerRadius"
+                    from: unifiedNotchRoot.cfgNotchBottomRadius
+                    to: 22
+                    duration: 280
+                    easing.type: Easing.OutCubic
+                }
+            }
+        }
+
+        SequentialAnimation {
+            PauseAnimation { duration: 90 } // Biarkan bodi notch membuka sebagian dulu
             NumberAnimation {
                 target: expandedContent
                 property: "opacity"
                 from: 0.0
                 to: 1.0
-                duration: 170
+                duration: 190
                 easing.type: Easing.OutQuad
             }
         }
@@ -407,6 +435,9 @@ Item {
             });
             unifiedNotchRoot.targetH = Qt.binding(function() {
                 return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
+            });
+            unifiedNotchRoot.cornerRadius = Qt.binding(function() {
+                return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : unifiedNotchRoot.cfgNotchBottomRadius;
             });
             expandedContent.opacity = 1.0;
         }
@@ -422,7 +453,7 @@ Item {
         closeSequenceAnimation.restart();
     }
 
-    function startExpand() {
+    function startExpand(initialW, initialH) {
         if (closeSequenceAnimation.running) {
             closeSequenceAnimation.stop();
             isClosing = false;
@@ -430,6 +461,17 @@ Item {
         isOpening = true;
         isClosing = false;
         bodyOpacity = 1.0;
+
+        var startW = (initialW !== undefined && initialW > 0) ? initialW : compactWidth;
+        var startH = (initialH !== undefined && initialH > 0) ? initialH : compactHeight;
+        animStartW = startW;
+        animStartH = startH;
+
+        targetW = startW;
+        targetH = startH;
+        cornerRadius = cfgNotchBottomRadius;
+        expandedContent.opacity = 0.0;
+
         openSequenceAnimation.restart();
     }
 
@@ -439,6 +481,9 @@ Item {
         });
         targetH = Qt.binding(function() {
             return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
+        });
+        cornerRadius = Qt.binding(function() {
+            return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : unifiedNotchRoot.cfgNotchBottomRadius;
         });
         expandedContent.opacity = 1.0;
         bodyOpacity = 1.0;
@@ -468,7 +513,10 @@ Item {
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
         radius: (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? unifiedNotchRoot.cornerRadius : (height / 2)
-        Behavior on radius { NumberAnimation { duration: 200 } }
+        Behavior on radius {
+            enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
+            NumberAnimation { duration: 200 }
+        }
         color: unifiedNotchRoot.effectiveBgColor
         Behavior on color { ColorAnimation { duration: 300 } }
         border.width: 0
@@ -484,6 +532,7 @@ Item {
         visible: !unifiedNotchRoot.isFloatingStyle
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
+        preferredRendererType: Shape.CurveRenderer
         layer.enabled: visible && (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isMorphing || opacity > 0)
         layer.samples: 4
 
@@ -709,10 +758,13 @@ Item {
                 }
             }
 
-            // Cards Body Area - Fills notch body completely (Full-Bleed)
+            // Cards Body Area - Fills notch body completely (Full-Bleed, stable size to avoid layout reflow during animation)
             Item {
                 id: cardBodyContainer
-                anchors.fill: parent
+                anchors.top: parent.top
+                anchors.horizontalCenter: parent.horizontalCenter
+                width: unifiedNotchRoot.standardCardWidth
+                height: unifiedNotchRoot.standardCardHeight
                 clip: true
 
                 Loader {

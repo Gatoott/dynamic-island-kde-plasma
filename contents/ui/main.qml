@@ -1052,17 +1052,38 @@ PlasmoidItem {
     // --- Independent Window Surface State (NON-REACTIVE TO isExpanded) ---
     property bool dialogSurfaceOpen: false
 
+    // Status keterlihatan kapsul standby di panel (Mencegah gap/kedip saat transisi window Wayland)
+    property bool compactVisible: true
+
     // Timer Fallback Penutupan Dialog (Mencegah Deadlock):
     Timer {
         id: closeWatchdogTimer
-        interval: 380 // Sedikit lebih lama dari durasi animasi 220ms
+        interval: 450 // Sedikit lebih lama dari durasi animasi close 220ms + handover 32ms
         repeat: false
         onTriggered: {
             if (!root.isExpanded || (expandedCardPanel && expandedCardPanel.isClosing)) {
                 console.log("[NOTCH] Watchdog: Memastikan dialog tertutup dan notch panel aktif");
+                root.compactVisible = true;
                 if (expandedCardPanel) expandedCardPanel.isClosing = false;
+                expandedDialog.visible = false;
                 root.dialogSurfaceOpen = false;
                 root.isExpanded = false;
+            }
+        }
+    }
+
+    // Timer Handover Frame: Memberi waktu compositor Wayland merender panel pill sebelum overlay window di-unmap
+    Timer {
+        id: closeHandoverTimer
+        interval: 32 // ~2 frame pada 60Hz agar handover mulus tanpa kedip
+        repeat: false
+        onTriggered: {
+            expandedDialog.visible = false;
+            root.dialogSurfaceOpen = false;
+            root.isExpanded = false;
+            if (expandedCardPanel) {
+                expandedCardPanel.isClosing = false;
+                expandedCardPanel.resetGeometryAfterUnmap();
             }
         }
     }
@@ -1071,8 +1092,15 @@ PlasmoidItem {
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
+        if (closeHandoverTimer.running) {
+            closeHandoverTimer.stop();
+        }
         var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
         if (card.isClosing) return;
+
+        // Ambil dimensi kapsul standby saat ini persis sebelum tab/status notifikasi diubah
+        var startW = (root.inPanel && panelCompactNotch.width > 0) ? panelCompactNotch.width : root.currentCompactWidth;
+        var startH = root.cfgCompactHeight;
 
         // 1. Reset state penutup & pastikan tab aktif benar
         card.isClosing = false;
@@ -1090,24 +1118,27 @@ PlasmoidItem {
         }
 
         if (root.inPanel) {
-            // 2. RESTORASI UKURAN & VISIBILITAS KONTEN SECARA INSTAN:
-            card.targetW = card.getTargetWidthForTab(root.currentExpandedTab, root.showLyrics);
-            card.targetH = card.standardCardHeight;
-            card.expandedContentArea.opacity = 1.0; // Wajib di-reset agar tidak transparan saat dibuka kembali!
+            // Set geometri awal persis sama dengan kapsul standby di panel
+            card.targetW = startW;
+            card.targetH = startH;
+            card.expandedContentArea.opacity = 0.0;
 
-            // 3. Buka jendela surface dialog
+            // Buka jendela surface dialog
             root.dialogSurfaceOpen = true;
             expandedDialog.visible = true;
             root.isExpanded = true;
 
-            // 4. Jalankan animasi morphing pembuka
-            card.startExpand();
+            // Sembunyikan kapsul standby di panel (overlay menggantikan di posisi & ukuran yang sama)
+            root.compactVisible = false;
+
+            // Jalankan animasi morphing pembuka dengan start dimensions
+            card.startExpand(startW, startH);
         } else {
             card.targetW = card.getTargetWidthForTab(root.currentExpandedTab, root.showLyrics);
             card.targetH = card.standardCardHeight;
             card.expandedContentArea.opacity = 1.0;
             root.isExpanded = true;
-            desktopLivingNotch.startExpand();
+            desktopLivingNotch.startExpand(startW, startH);
         }
     }
 
@@ -1128,6 +1159,9 @@ PlasmoidItem {
         if (card.isClosing || !root.isExpanded) return;
 
         console.log("[NOTCH] Mulai penutupan atomik...");
+        if (closeHandoverTimer.running) {
+            closeHandoverTimer.stop();
+        }
         closeWatchdogTimer.restart(); // Jalankan timer pengaman anti-deadlock
         card.startCollapse();
     }
@@ -1154,18 +1188,12 @@ PlasmoidItem {
         height: root.cfgCompactHeight
 
         anchors.top: parent.top
-        anchors.topMargin: root.effectiveVerticalOffset
+        anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
-        opacity: root.isExpanded ? 0.0 : 1.0
-        Behavior on opacity {
-            NumberAnimation {
-                duration: 140
-                easing.type: Easing.OutCubic
-            }
-        }
-        enabled: !root.isExpanded && !(expandedCardPanel && expandedCardPanel.isClosing) && !(expandedCardPanel && expandedCardPanel.isOpening)
+        opacity: root.compactVisible ? 1.0 : 0.0
+        enabled: root.compactVisible && !root.isExpanded && !(expandedCardPanel && expandedCardPanel.isClosing) && !(expandedCardPanel && expandedCardPanel.isOpening)
 
         CompactView {
             id: panelCompactNotch
@@ -1405,19 +1433,12 @@ PlasmoidItem {
                 }
 
                 onCollapseFinished: {
-                    console.log("[NOTCH] Animasi ciut fisik selesai: unmap dialog window dan tampilkan standby pill.");
+                    console.log("[NOTCH] Animasi ciut fisik selesai: handover ke standby pill lalu unmap dialog window.");
                     closeWatchdogTimer.stop();
-                    // 1. Matikan dialog surface window
-                    expandedDialog.visible = false;
-                    root.dialogSurfaceOpen = false;
-                    root.isExpanded = false;
-                    expandedCardPanel.isClosing = false;
-
-                    // 2. Reset ukuran & konten kartu secara aman di tick berikutnya setelah window unmapped
-                    Qt.callLater(function() {
-                        expandedCardPanel.resetGeometryAfterUnmap();
-                        expandedCardPanel.expandedContentArea.opacity = 1.0;
-                    });
+                    // 1. Tampilkan standby pill di panel secara instan (0ms delay)
+                    root.compactVisible = true;
+                    // 2. Beri waktu Wayland compositor me-render standby pill sebelum overlay window di-unmap
+                    closeHandoverTimer.restart();
                 }
             }
         }
