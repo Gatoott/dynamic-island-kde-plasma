@@ -27,6 +27,8 @@ Item {
     property color miniVisCustomColor: (plasmoidConfig && plasmoidConfig.miniVisCustomColor) ? Qt.color(plasmoidConfig.miniVisCustomColor) : Qt.color("#38bdf8")
     property int miniVisAlignment: (plasmoidConfig && plasmoidConfig.miniVisAlignment !== undefined) ? plasmoidConfig.miniVisAlignment : 1
     property bool miniVisRounded: (plasmoidConfig && plasmoidConfig.miniVisRounded !== undefined) ? plasmoidConfig.miniVisRounded : true
+    property var visualizerLevels: []
+    property bool visualizerServiceActive: false
 
     // Mini Music Icon (Left of Clock) Customization
     property bool miniMusicIconEnabled: {
@@ -156,7 +158,7 @@ Item {
             Layout.alignment: Qt.AlignVCenter
             isPlaying: standbyRoot.isPlaying
             albumColor: standbyRoot.albumColor || standbyRoot.accentColor
-            visible: standbyRoot.isPlaying && standbyRoot.showVisualizer
+            visible: standbyRoot.showVisualizer && (standbyRoot.isPlaying || (standbyRoot.visualizerServiceActive && standbyRoot.visualizerLevels && (standbyRoot.visualizerLevels[0] > 0.02 || standbyRoot.visualizerLevels[1] > 0.02 || standbyRoot.visualizerLevels[2] > 0.02 || standbyRoot.visualizerLevels[3] > 0.02)))
             barWidth: standbyRoot.miniVisBarWidth
             maxHeight: standbyRoot.miniVisHeight
             spacing: standbyRoot.miniVisSpacing
@@ -164,6 +166,8 @@ Item {
             customColor: standbyRoot.miniVisCustomColor
             alignment: standbyRoot.miniVisAlignment
             rounded: standbyRoot.miniVisRounded
+            levels: standbyRoot.visualizerLevels
+            realAudioActive: standbyRoot.visualizerServiceActive
         }
     }
 }

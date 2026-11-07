@@ -138,6 +138,8 @@ Item {
     property int sysBatteryPct: 100
     property bool showPillLyrics: false
     property string currentLyricLine: ""
+    property var visualizerLevels: []
+    property bool visualizerServiceActive: false
 
     signal requestToggle()
 
@@ -309,6 +311,8 @@ Item {
             miniVisCustomColor: compactNotchRoot.miniVisCustomColor
             miniVisAlignment: compactNotchRoot.miniVisAlignment
             miniVisRounded: compactNotchRoot.miniVisRounded
+            visualizerLevels: compactNotchRoot.visualizerLevels
+            visualizerServiceActive: compactNotchRoot.visualizerServiceActive
         }
 
         // State 4: Standby View (Jam & Audio Visualizer)
@@ -334,6 +338,8 @@ Item {
             miniVisCustomColor: compactNotchRoot.miniVisCustomColor
             miniVisAlignment: compactNotchRoot.miniVisAlignment
             miniVisRounded: compactNotchRoot.miniVisRounded
+            visualizerLevels: compactNotchRoot.visualizerLevels
+            visualizerServiceActive: compactNotchRoot.visualizerServiceActive
 
             miniMusicIconEnabled: compactNotchRoot.miniMusicIconEnabled
             miniMusicIconSize: compactNotchRoot.miniMusicIconSize

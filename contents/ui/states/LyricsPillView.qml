@@ -86,6 +86,8 @@ Item {
         if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniVisRounded !== undefined) return Plasmoid.configuration.miniVisRounded;
         return true;
     }
+    property var visualizerLevels: []
+    property bool visualizerServiceActive: false
 
     implicitHeight: 34
 
@@ -218,6 +220,8 @@ Item {
             customColor: lyricsPillRoot.miniVisCustomColor
             alignment: lyricsPillRoot.miniVisAlignment
             rounded: lyricsPillRoot.miniVisRounded
+            levels: lyricsPillRoot.visualizerLevels
+            realAudioActive: lyricsPillRoot.visualizerServiceActive
         }
     }
 }

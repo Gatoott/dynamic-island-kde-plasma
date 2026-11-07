@@ -1,0 +1,13 @@
+[Unit]
+Description=Plasma Dynamic Island Audio Visualizer Service (cava D-Bus Provider)
+After=graphical-session.target pipewire.service
+PartOf=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/python3 %h/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland/contents/code/plasma-visualizer-service.py
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=default.target
+

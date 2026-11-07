@@ -135,6 +135,8 @@ Item {
     property int cfgClockFontSize: 13
     property bool cfgShowVisualizer: true
     property bool cfgShowCompactVisualizer: false
+    property var visualizerLevels: []
+    property bool visualizerServiceActive: false
     property color albumDominantColor: cfgAccentColor
     property string currentDateString: ""
 
@@ -684,6 +686,8 @@ Item {
                 miniVisCustomColor: unifiedNotchRoot.miniVisCustomColor
                 miniVisAlignment: unifiedNotchRoot.miniVisAlignment
                 miniVisRounded: unifiedNotchRoot.miniVisRounded
+                visualizerLevels: unifiedNotchRoot.visualizerLevels
+                visualizerServiceActive: unifiedNotchRoot.visualizerServiceActive
             }
 
             // State 4: Standby View (Music Icon, Clock, Visualizer)
@@ -709,6 +713,8 @@ Item {
                 miniVisCustomColor: unifiedNotchRoot.miniVisCustomColor
                 miniVisAlignment: unifiedNotchRoot.miniVisAlignment
                 miniVisRounded: unifiedNotchRoot.miniVisRounded
+                visualizerLevels: unifiedNotchRoot.visualizerLevels
+                visualizerServiceActive: unifiedNotchRoot.visualizerServiceActive
 
                 miniMusicIconEnabled: unifiedNotchRoot.miniMusicIconEnabled
                 miniMusicIconSize: unifiedNotchRoot.miniMusicIconSize
@@ -850,6 +856,8 @@ Item {
                         currentTimeString: unifiedNotchRoot.currentTimeString
                         currentDateString: unifiedNotchRoot.currentDateString
                         clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
+                        visualizerLevels: unifiedNotchRoot.visualizerLevels
+                        visualizerServiceActive: unifiedNotchRoot.visualizerServiceActive
 
                         onRequestPlayPause: unifiedNotchRoot.requestPlayPause()
                         onRequestNext: unifiedNotchRoot.requestNext()

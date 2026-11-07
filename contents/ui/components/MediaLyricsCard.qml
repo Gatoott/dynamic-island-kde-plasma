@@ -50,6 +50,8 @@ Item {
     }
 
     property bool showLyrics: false
+    property var visualizerLevels: []
+    property bool visualizerServiceActive: false
     property var lyricsList: []
     property int currentLyricIndex: -1
     property bool lyricsLoading: false
@@ -447,6 +449,8 @@ Item {
                     barWidth: 2.5
                     spacing: 2.5
                     maxHeight: 16
+                    levels: mediaCardRoot.visualizerLevels
+                    realAudioActive: mediaCardRoot.visualizerServiceActive
                 }
             }
 

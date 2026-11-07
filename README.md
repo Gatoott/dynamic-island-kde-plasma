@@ -231,22 +231,22 @@ Buka terminal (**Konsole**), lalu jalankan perintah instalasi paket sesuai distr
 
 #### 🔹 Arch Linux / Manjaro / EndeavourOS
 ```bash
-sudo pacman -S --needed git qt6-declarative qt6-5compat kirigami libnotify playerctl
+sudo pacman -S --needed git qt6-declarative qt6-5compat kirigami libnotify playerctl cava
 ```
 
 #### 🔹 Ubuntu / Kubuntu / Debian / KDE neon
 ```bash
-sudo apt update && sudo apt install -y git qml6-module-qtquick qml6-module-qtquick-shapes qml6-module-org-kde-kirigami libnotify-bin playerctl
+sudo apt update && sudo apt install -y git qml6-module-qtquick qml6-module-qtquick-shapes qml6-module-org-kde-kirigami libnotify-bin playerctl cava
 ```
 
 #### 🔹 Fedora / Nobara / RHEL
 ```bash
-sudo dnf install -y git qt6-qtdeclarative qt6-qt5compat kf6-kirigami libnotify playerctl
+sudo dnf install -y git qt6-qtdeclarative qt6-qt5compat kf6-kirigami libnotify playerctl cava
 ```
 
 #### 🔹 openSUSE (Tumbleweed / Leap)
 ```bash
-sudo zypper install -y git qt6-declarative kirigami-imports libnotify playerctl
+sudo zypper install -y git qt6-declarative kirigami-imports libnotify playerctl cava
 ```
 
 ---
@@ -289,6 +289,40 @@ systemctl --user restart plasma-plasmashell.service
 3. Cari **"Plasma Dynamic Island"**.
 4. Tarik (*drag and drop*) widget tersebut ke posisi tengah panel atas.
 5. Selesai! Dynamic Island sudah aktif dan siap dinikmati. 🎉
+
+---
+
+### Langkah 5 (Opsional): Mengaktifkan Real Audio Visualizer (cava)
+
+Secara default, widget memiliki animasi visualizer bawaan. Untuk membuatnya membaca dan bergerak mengikuti frekuensi audio nyata secara real-time via PipeWire/Pulse:
+
+1. **Pastikan paket `cava` terpasang:**
+   ```bash
+   # Fedora
+   sudo dnf install -y cava
+   # Arch Linux
+   sudo pacman -S cava
+   # Ubuntu / Debian
+   sudo apt install -y cava
+   ```
+
+2. **Aktifkan background service penyedia spektrum D-Bus:**
+   ```bash
+   # Jalankan skrip installer otomatis bawaan widget:
+   bash ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland/contents/code/install-service.sh
+   ```
+   *Atau pasang manual ke systemd user:*
+   ```bash
+   mkdir -p ~/.config/systemd/user
+   cp ~/.local/share/plasma/plasmoids/org.kde.plasma.dynamicisland/contents/code/plasma-visualizer-service.service ~/.config/systemd/user/
+   systemctl --user daemon-reload
+   systemctl --user enable --now plasma-visualizer-service.service
+   ```
+
+3. **Cara Pengujian:**
+   - **Putar lagu / audio** (Spotify, browser, YouTube, dsb): 4 bar visualizer akan naik-turun selaras dengan ketukan dan intensitas suara nyata.
+   - **Pause lagu**: Bar otomatis kembali ke posisi minimum dan service otomatis menghentikan proses cava (**0.0% CPU**).
+   - **Hentikan service**: `systemctl --user stop plasma-visualizer-service.service` — visualizer otomatis beralih (*graceful fallback*) ke animasi loop bawaan tanpa kendala.
 
 ---
 

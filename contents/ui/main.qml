@@ -415,6 +415,11 @@ PlasmoidItem {
             lyricsSyncTimer.restart();
         }
         updateLyricProgress(trackPosition);
+
+        // Sinkronisasi status playback ke backend audio visualizer cava
+        if (dbusVisSetPlaying && dbusVisSetPlaying.call) {
+            dbusVisSetPlaying.call("SetPlaying", [root.isPlaying]);
+        }
     }
 
     function updateLyricProgress(pos) {
@@ -969,6 +974,94 @@ PlasmoidItem {
         });
     }
 
+    // --- Real Audio Visualizer Client (cava D-Bus Provider) ---
+    property var visualizerLevels: [0.0, 0.0, 0.0, 0.0]
+    property bool visualizerServiceActive: false
+
+    function handleVisualizerData(source) {
+        if (!source) return;
+        var lv = source["levels"] !== undefined ? source["levels"] : source.levels;
+        if (lv !== undefined && lv !== null) {
+            var actualLv = (typeof lv === "object" && lv.value !== undefined) ? lv.value : lv;
+            if (actualLv && actualLv.length >= 4) {
+                var clean = [];
+                for (var i = 0; i < 4; i++) {
+                    var item = actualLv[i];
+                    var val = (typeof item === "object" && item !== null && item.value !== undefined) ? Number(item.value) : Number(item);
+                    clean.push(isNaN(val) ? 0.0 : Math.max(0.0, Math.min(1.0, val)));
+                }
+                root.visualizerLevels = clean;
+                root.visualizerServiceActive = true;
+                visualizerHeartbeatTimer.restart();
+            }
+        }
+        var act = source["active"] !== undefined ? source["active"] : source.active;
+        if (act !== undefined && act !== null) {
+            var actualAct = (typeof act === "object" && act.value !== undefined) ? act.value : act;
+            root.visualizerServiceActive = Boolean(actualAct);
+        }
+    }
+
+    DBus.SignalWatcher {
+        id: visualizerSignalWatcher
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.visualizer"
+        path: "/Visualizer"
+        iface: "org.kde.plasma.dynamicisland.visualizer"
+
+        function dbusLevelsChanged(levels, active) {
+            if (levels && levels.length >= 4) {
+                var clean = [];
+                for (var i = 0; i < 4; i++) {
+                    var item = levels[i];
+                    var val = (typeof item === "object" && item !== null && item.value !== undefined) ? Number(item.value) : Number(item);
+                    clean.push(isNaN(val) ? 0.0 : Math.max(0.0, Math.min(1.0, val)));
+                }
+                root.visualizerLevels = clean;
+                root.visualizerServiceActive = Boolean(active);
+                visualizerHeartbeatTimer.restart();
+            }
+        }
+    }
+
+    DBus.Properties {
+        id: visualizerProps
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.visualizer"
+        path: "/Visualizer"
+        iface: "org.kde.plasma.dynamicisland.visualizer"
+
+        onPropertiesChanged: (ifaceName, changedProps, invalidated) => {
+            root.handleVisualizerData(changedProps);
+        }
+        onRefreshed: {
+            root.handleVisualizerData(properties);
+        }
+        Component.onCompleted: {
+            updateAll();
+        }
+    }
+
+    DBusCall {
+        id: dbusVisSetPlaying
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.visualizer"
+        path: "/Visualizer"
+        iface: "org.kde.plasma.dynamicisland.visualizer"
+        member: "SetPlaying"
+    }
+
+    Timer {
+        id: visualizerHeartbeatTimer
+        interval: 1200
+        repeat: false
+        onTriggered: {
+            if (root.visualizerServiceActive) {
+                root.visualizerServiceActive = false;
+            }
+        }
+    }
+
     // --- Global Notifications Monitor (WatchedNotificationsModel & Session History) ---
     property bool activeNotificationPill: false
     property string notifAppName: ""
@@ -1227,6 +1320,8 @@ PlasmoidItem {
             miniVisCustomColor: root.cfgMiniVisCustomColor
             miniVisAlignment: root.cfgMiniVisAlignment
             miniVisRounded: root.cfgMiniVisRounded
+            visualizerLevels: root.visualizerLevels
+            visualizerServiceActive: root.visualizerServiceActive
 
             miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
             miniMusicIconSize: root.cfgMiniMusicIconSize
@@ -1362,6 +1457,8 @@ PlasmoidItem {
                 miniVisCustomColor: root.cfgMiniVisCustomColor
                 miniVisAlignment: root.cfgMiniVisAlignment
                 miniVisRounded: root.cfgMiniVisRounded
+                visualizerLevels: root.visualizerLevels
+                visualizerServiceActive: root.visualizerServiceActive
 
                 miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
                 miniMusicIconSize: root.cfgMiniMusicIconSize
@@ -1511,6 +1608,8 @@ PlasmoidItem {
         miniVisCustomColor: root.cfgMiniVisCustomColor
         miniVisAlignment: root.cfgMiniVisAlignment
         miniVisRounded: root.cfgMiniVisRounded
+        visualizerLevels: root.visualizerLevels
+        visualizerServiceActive: root.visualizerServiceActive
 
         miniMusicIconEnabled: root.cfgMiniMusicIconEnabled
         miniMusicIconSize: root.cfgMiniMusicIconSize
