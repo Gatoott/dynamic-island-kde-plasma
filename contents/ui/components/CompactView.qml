@@ -25,7 +25,15 @@ Item {
     // Style & Shape Options
     property int notchStyle: 0
     property string islandShapeMode: "notch"
-    readonly property bool isFloatingStyle: notchStyle === 1 || islandShapeMode === "dock" || islandShapeMode === "pill"
+    readonly property bool isFloatingStyle: {
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchStyle !== undefined) {
+            return plasmoid.configuration.notchStyle === 1;
+        }
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.notchStyle !== undefined) {
+            return Plasmoid.configuration.notchStyle === 1;
+        }
+        return notchStyle === 1;
+    }
     readonly property real effectiveWingR: isFloatingStyle ? 0 : wingR
 
     property color cfgBgColor: "#0b0b0f"

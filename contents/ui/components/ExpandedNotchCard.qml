@@ -11,10 +11,11 @@ Item {
     id: unifiedNotchRoot
     clip: true
 
-    // Pastikan root item kartu menempel kokoh di bibir atas container:
-    anchors.top: parent ? parent.top : undefined
-    anchors.topMargin: (typeof root !== "undefined" && root.isFloatingStyle) ? root.effectiveVerticalOffset : 0
-    anchors.horizontalCenter: parent ? parent.horizontalCenter : undefined
+    anchors.top: parent.top
+    anchors.horizontalCenter: parent.horizontalCenter
+    anchors.topMargin: unifiedNotchRoot.isFloatingStyle 
+        ? ((typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchYOffset) ? plasmoid.configuration.notchYOffset : 8) 
+        : 0
 
     // State
     property bool isExpanded: false
@@ -23,7 +24,15 @@ Item {
     property string currentTimeString: "00:00"
     property int notchStyle: 0
     property string islandShapeMode: "notch"
-    readonly property bool isFloatingStyle: notchStyle === 1 || islandShapeMode === "dock" || islandShapeMode === "pill"
+    readonly property bool isFloatingStyle: {
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchStyle !== undefined) {
+            return plasmoid.configuration.notchStyle === 1;
+        }
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.notchStyle !== undefined) {
+            return Plasmoid.configuration.notchStyle === 1;
+        }
+        return notchStyle === 1;
+    }
 
     // Tab Modular Visibility
     property bool showControlTab: true

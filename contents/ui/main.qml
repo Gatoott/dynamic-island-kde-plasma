@@ -10,6 +10,7 @@ import org.kde.plasma.private.battery as Battery
 import org.kde.ksysguard.sensors as Sensors
 import org.kde.notificationmanager as NotificationManager
 import org.kde.plasma.workspace.dbus as DBus
+import org.kde.layershell as LayerShellQt
 import "components"
 import "states"
 
@@ -35,15 +36,16 @@ PlasmoidItem {
     readonly property int cfgHorizontalOffset: Plasmoid.configuration.horizontalOffset !== undefined ? Plasmoid.configuration.horizontalOffset : 0
     readonly property int cfgClockFontSize: Plasmoid.configuration.clockFontSize || 13
     readonly property string cfgIslandShapeMode: Plasmoid.configuration.islandShapeMode || "notch"
-    readonly property int cfgNotchStyle: {
-        if (Plasmoid.configuration.notchStyle !== undefined) {
-            return Plasmoid.configuration.notchStyle;
+    readonly property bool isFloatingStyle: {
+        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchStyle !== undefined) {
+            return plasmoid.configuration.notchStyle === 1;
         }
-        var s = Plasmoid.configuration.islandShapeMode;
-        if (s === "pill" || s === "dock" || s === "circle") return 1;
-        return 0;
+        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.notchStyle !== undefined) {
+            return Plasmoid.configuration.notchStyle === 1;
+        }
+        return false;
     }
-    readonly property bool isFloatingStyle: cfgNotchStyle === 1 || cfgIslandShapeMode === "dock" || cfgIslandShapeMode === "pill" || cfgIslandShapeMode === "circle"
+    readonly property int cfgNotchStyle: isFloatingStyle ? 1 : 0
 
     // Tetap baca nilai custom margin dari pengaturan plasmoid:
     property int cfgVerticalOffset: Plasmoid.configuration.verticalOffset !== undefined 
@@ -1088,10 +1090,6 @@ PlasmoidItem {
         }
 
         if (root.inPanel) {
-            // Posisikan jendela dialog tepat di tengah atas layar:
-            expandedDialog.x = Math.round((Screen.width - expandedDialog.width) / 2) + root.cfgHorizontalOffset;
-            expandedDialog.y = root.isFloatingStyle ? root.effectiveVerticalOffset : 0;
-
             // 2. RESTORASI UKURAN & VISIBILITAS KONTEN SECARA INSTAN:
             card.targetW = card.getTargetWidthForTab(root.currentExpandedTab, root.showLyrics);
             card.targetH = card.standardCardHeight;
@@ -1231,22 +1229,22 @@ PlasmoidItem {
 
     // ==============================================================
     // 2. PANEL EXPANDED OVERLAY (Transparent Fixed-Canvas Overlay)
-    // Ukuran window dialog statis (720x480) dengan NoBackground (tanpa frame & shadow)
+    // Ukuran window dialog statis (720x520) dengan NoBackground (tanpa frame & shadow)
     // Berada di bibir paling atas layar (y=0) sehingga siluet utuh yang melar
     // ==============================================================
-    PlasmaCore.Dialog {
+    Window {
         id: expandedDialog
         width: 720
-        height: 480
-        // Lepaskan ikatan visualParent: atur koordinat absolut terhadap layar (menempel di tengah atas)
-        x: Math.round((Screen.width - width) / 2) + root.cfgHorizontalOffset
-        y: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
-        location: PlasmaCore.Types.Floating
-        type: PlasmaCore.Dialog.Normal
-        flags: Qt.WindowStaysOnTopHint | Qt.FramelessWindowHint | Qt.BypassWindowManagerHint | Qt.NoDropShadowWindowHint
-        backgroundHints: PlasmaCore.Types.NoBackground
-        hideOnWindowDeactivate: false
+        height: 520
+        color: "transparent"
+        flags: Qt.FramelessWindowHint
         visible: root.dialogSurfaceOpen
+
+        LayerShellQt.Window.layer: LayerShellQt.Window.LayerTop
+        LayerShellQt.Window.anchors: LayerShellQt.Window.AnchorTop
+        LayerShellQt.Window.scope: "dynamic-island"
+        LayerShellQt.Window.exclusionZone: -1
+        LayerShellQt.Window.keyboardInteractivity: LayerShellQt.Window.KeyboardInteractivityOnDemand
 
         onActiveChanged: {
             if (!active && root.isExpanded && !expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
@@ -1255,16 +1253,12 @@ PlasmoidItem {
             }
         }
 
-        mainItem: Item {
+        Item {
             id: fixedCanvas
             clip: false
-            implicitWidth: 720
-            implicitHeight: 480
+            anchors.fill: parent
             width: 720
-            height: 480
-            anchors.top: parent.top
-            anchors.topMargin: 0
-            y: 0
+            height: 520
 
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
             MouseArea {
@@ -1284,6 +1278,7 @@ PlasmoidItem {
                 anchors.top: parent.top
                 anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
                 anchors.horizontalCenter: parent.horizontalCenter
+                anchors.horizontalCenterOffset: root.cfgHorizontalOffset
                 isOverlayDialog: true
                 compactWidth: root.currentCompactWidth
                 compactHeight: root.cfgCompactHeight
