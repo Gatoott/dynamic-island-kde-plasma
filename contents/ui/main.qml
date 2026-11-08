@@ -353,8 +353,8 @@ PlasmoidItem {
         repeat: false
         onTriggered: {
             if (!root.isPlaying) return;
-            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
-            var estPos = root.lastSyncPosition + elapsedSec;
+            var estPos = root.getEstimatedTrackPosition();
+            root.estimatedTrackPosition = estPos;
             root.updateLyricProgress(estPos);
         }
     }
@@ -366,13 +366,53 @@ PlasmoidItem {
         repeat: true
         running: root.isPlaying && root.isExpanded
         onTriggered: {
-            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
-            var estPos = root.lastSyncPosition + elapsedSec;
-            if (root.trackLength > 0 && estPos > root.trackLength) {
-                estPos = root.trackLength;
-            }
+            var estPos = root.getEstimatedTrackPosition();
             root.estimatedTrackPosition = estPos;
         }
+    }
+
+    // 3. Safety net pasif (1000ms): Hanya aktif saat lagu berputar, mode lirik aktif, dan ada lirik.
+    // Menjaga sinkronisasi tetap presisi jika ada drift waktu atau event player yang terlambat.
+    Timer {
+        id: lyricsSafetyNetTimer
+        interval: 1000
+        repeat: true
+        running: root.isPlaying && root.showLyrics && (root.lyricsList && root.lyricsList.length > 0)
+        onTriggered: {
+            var estPos = root.getEstimatedTrackPosition();
+            root.estimatedTrackPosition = estPos;
+            root.updateLyricProgress(estPos);
+        }
+    }
+
+    function getEstimatedTrackPosition() {
+        if (!isPlaying || lastSyncTimestamp <= 0) {
+            return lastSyncPosition;
+        }
+        var elapsedSec = (Date.now() - lastSyncTimestamp) / 1000.0;
+        var estPos = lastSyncPosition + elapsedSec;
+        if (trackLength > 0 && estPos > trackLength) {
+            estPos = trackLength;
+        }
+        return estPos;
+    }
+
+    function syncLyrics() {
+        if (!lyricsList || lyricsList.length === 0) {
+            currentLyricIndex = -1;
+            currentLyricLine = "";
+            nextLyricTimer.stop();
+            return;
+        }
+        var estPos = getEstimatedTrackPosition();
+        estimatedTrackPosition = estPos;
+        updateLyricProgress(estPos);
+    }
+
+    onLyricsListChanged: {
+        currentLyricIndex = -1;
+        currentLyricLine = "";
+        syncLyrics();
     }
 
     onTrackTitleChanged: {
@@ -380,9 +420,9 @@ PlasmoidItem {
         currentLyricLine = "";
         lyricsList = [];
         lyricsFound = false;
-        lastSyncPosition = 0;
+        lastSyncPosition = trackPosition;
         lastSyncTimestamp = Date.now();
-        estimatedTrackPosition = 0;
+        estimatedTrackPosition = trackPosition;
         retryCount = 0;
         retryLyricsTimer.stop();
         nextLyricTimer.stop();
@@ -396,9 +436,9 @@ PlasmoidItem {
         currentLyricLine = "";
         lyricsList = [];
         lyricsFound = false;
-        lastSyncPosition = 0;
+        lastSyncPosition = trackPosition;
         lastSyncTimestamp = Date.now();
-        estimatedTrackPosition = 0;
+        estimatedTrackPosition = trackPosition;
         retryCount = 0;
         retryLyricsTimer.stop();
         nextLyricTimer.stop();
@@ -407,19 +447,34 @@ PlasmoidItem {
         }
     }
 
+    onActivePlayerChanged: {
+        lastSyncPosition = trackPosition;
+        lastSyncTimestamp = Date.now();
+        estimatedTrackPosition = trackPosition;
+        if (trackTitle && trackTitle.length > 0) {
+            fetchLyrics(true);
+        } else {
+            lyricsList = [];
+            currentLyricIndex = -1;
+            currentLyricLine = "";
+            nextLyricTimer.stop();
+        }
+        syncLyrics();
+    }
+
     onShowLyricsChanged: {
         if (showLyrics && (!lyricsList || lyricsList.length === 0)) {
             fetchLyrics(true);
         } else if (showLyrics) {
-            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
-            updateLyricProgress(root.lastSyncPosition + elapsedSec);
+            syncLyrics();
+        } else {
+            nextLyricTimer.stop();
         }
     }
 
     onIsExpandedChanged: {
         if (isExpanded) {
-            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
-            var estPos = root.lastSyncPosition + elapsedSec;
+            var estPos = getEstimatedTrackPosition();
             root.estimatedTrackPosition = estPos;
             updateLyricProgress(estPos);
         }
@@ -429,7 +484,7 @@ PlasmoidItem {
         lastSyncPosition = trackPosition;
         lastSyncTimestamp = Date.now();
         estimatedTrackPosition = trackPosition;
-        updateLyricProgress(trackPosition);
+        syncLyrics();
     }
 
     onIsPlayingChanged: {
@@ -439,7 +494,7 @@ PlasmoidItem {
         if (!isPlaying) {
             nextLyricTimer.stop();
         }
-        updateLyricProgress(trackPosition);
+        syncLyrics();
 
         // Sinkronisasi status playback ke backend audio visualizer cava
         if (dbusVisSetPlaying && dbusVisSetPlaying.call) {
@@ -477,8 +532,10 @@ PlasmoidItem {
             if (nextIdx < lyricsList.length) {
                 var timeRemaining = lyricsList[nextIdx].time - pos;
                 var delayMs = Math.max(25, Math.round(timeRemaining * 1000));
-                nextLyricTimer.interval = delayMs;
-                nextLyricTimer.restart();
+                if (!nextLyricTimer.running || Math.abs(nextLyricTimer.interval - delayMs) > 200) {
+                    nextLyricTimer.interval = delayMs;
+                    nextLyricTimer.restart();
+                }
             } else {
                 nextLyricTimer.stop();
             }
@@ -681,6 +738,7 @@ PlasmoidItem {
                                 root.lyricsLoading = false;
                                 root.retryCount = 0;
                                 retryLyricsTimer.stop();
+                                root.syncLyrics();
                                 return;
                             }
                         }
@@ -732,6 +790,7 @@ PlasmoidItem {
                                         root.lyricsLoading = false;
                                         root.retryCount = 0;
                                         retryLyricsTimer.stop();
+                                        root.syncLyrics();
                                         return;
                                     }
                                 } else if (best.plainLyrics && best.plainLyrics.trim().length > 0) {
@@ -746,6 +805,7 @@ PlasmoidItem {
                                         root.lyricsLoading = false;
                                         root.retryCount = 0;
                                         retryLyricsTimer.stop();
+                                        root.syncLyrics();
                                         return;
                                     }
                                 }
@@ -799,6 +859,7 @@ PlasmoidItem {
                                         root.lyricsFound = true;
                                         root.retryCount = 0;
                                         retryLyricsTimer.stop();
+                                        root.syncLyrics();
                                         return;
                                     }
                                 } else if (best.plainLyrics && best.plainLyrics.trim().length > 0) {
@@ -812,6 +873,7 @@ PlasmoidItem {
                                         root.lyricsFound = true;
                                         root.retryCount = 0;
                                         retryLyricsTimer.stop();
+                                        root.syncLyrics();
                                         return;
                                     }
                                 }
@@ -1106,6 +1168,10 @@ PlasmoidItem {
         function dbusSetExpanded(expanded) {
             if (expanded) root.openNotch(0);
             else root.closeNotch();
+        }
+
+        function dbusSetLyrics(show) {
+            root.showLyrics = Boolean(show);
         }
     }
 
@@ -1606,6 +1672,7 @@ PlasmoidItem {
                     ];
                     root.lyricsFound = true;
                     root.lyricsLoading = false;
+                    root.syncLyrics();
                 }
                 onRequestClearAllNotifications: root.clearAllNotifications()
                 onRequestRemoveNotification: (id) => root.removeNotification(id)
@@ -1757,6 +1824,7 @@ PlasmoidItem {
             ];
             root.lyricsFound = true;
             root.lyricsLoading = false;
+            root.syncLyrics();
         }
         onRequestClearAllNotifications: root.clearAllNotifications()
         onRequestRemoveNotification: (id) => root.removeNotification(id)
