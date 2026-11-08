@@ -252,8 +252,6 @@ Item {
         Shape {
             anchors.fill: parent
             visible: !mediaCardRoot.showLyrics && mediaCardRoot.mediaCardBgMode === 1 && mediaCardRoot.albumArtUrl !== ""
-            layer.enabled: visible
-            layer.samples: 4
             opacity: 0.75
 
             ShapePath {

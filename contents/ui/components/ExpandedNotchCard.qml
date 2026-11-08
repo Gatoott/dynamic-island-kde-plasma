@@ -487,7 +487,7 @@ Item {
         cornerRadius = Qt.binding(function() {
             return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : unifiedNotchRoot.cfgNotchBottomRadius;
         });
-        expandedContent.opacity = 1.0;
+        expandedContent.opacity = unifiedNotchRoot.isExpanded ? 1.0 : 0.0;
         bodyOpacity = 1.0;
     }
 
@@ -535,8 +535,6 @@ Item {
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
         preferredRendererType: Shape.CurveRenderer
-        layer.enabled: visible && (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isMorphing || opacity > 0)
-        layer.samples: 4
 
         // Siluet Tunggal Bodi Notch (Tanpa border samping & bawah)
         ShapePath {
@@ -736,8 +734,8 @@ Item {
         Item {
             id: expandedContent
             anchors.fill: parent
-            visible: opacity > 0
-            opacity: 1.0
+            visible: opacity > 0 && (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isOpening || unifiedNotchRoot.isClosing || unifiedNotchRoot.isMorphing)
+            opacity: unifiedNotchRoot.isExpanded ? 1.0 : 0.0
 
             // Clean top notch handle (mini pill grip)
             Item {

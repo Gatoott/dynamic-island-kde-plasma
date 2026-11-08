@@ -1490,7 +1490,7 @@ PlasmoidItem {
                 isOverlayDialog: true
                 compactWidth: root.currentCompactWidth
                 compactHeight: root.cfgCompactHeight
-                isExpanded: root.isExpanded
+                isExpanded: root.inPanel && root.isExpanded
                 notchStyle: root.cfgNotchStyle
                 islandShapeMode: root.cfgIslandShapeMode
                 cfgNotchWingRadius: root.cfgNotchWingRadius
@@ -1641,7 +1641,7 @@ PlasmoidItem {
 
         compactWidth: root.currentCompactWidth
         compactHeight: root.cfgCompactHeight
-        isExpanded: root.isExpanded
+        isExpanded: (!root.inPanel) && root.isExpanded
         notchStyle: root.cfgNotchStyle
         islandShapeMode: root.cfgIslandShapeMode
         cfgNotchWingRadius: root.cfgNotchWingRadius
@@ -1765,7 +1765,7 @@ PlasmoidItem {
             desktopLivingNotch.isClosing = false;
             Qt.callLater(function() {
                 desktopLivingNotch.resetGeometryAfterUnmap();
-                desktopLivingNotch.expandedContentArea.opacity = 1.0;
+                desktopLivingNotch.expandedContentArea.opacity = 0.0;
             });
         }
     }
