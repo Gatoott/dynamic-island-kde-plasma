@@ -792,25 +792,56 @@ PlasmoidItem {
     }
 
     // --- Native KDE Plasma 6 System Sensors ---
+    property bool initialSensorProbeDone: false
+    Timer {
+        id: initialSensorProbeTimer
+        interval: 4000
+        running: true
+        repeat: false
+        onTriggered: root.initialSensorProbeDone = true
+    }
+
     Sensors.Sensor {
         id: cpuSensor
         sensorId: "cpu/all/usage"
         updateRateLimit: 2000
+        enabled: root.isExpanded || !root.initialSensorProbeDone
     }
     Sensors.Sensor {
         id: ramSensor
         sensorId: "memory/physical/usedPercent"
         updateRateLimit: 2000
+        enabled: root.isExpanded || !root.initialSensorProbeDone
     }
     Sensors.Sensor {
         id: tempSensor
         sensorId: "cpu/all/averageTemperature"
         updateRateLimit: 2000
+        enabled: root.isExpanded || !root.initialSensorProbeDone
     }
 
-    readonly property int sysCpuPct: (typeof cpuSensor !== "undefined" && cpuSensor.value !== undefined && !isNaN(cpuSensor.value)) ? Math.round(cpuSensor.value) : 12
-    readonly property int sysRamPct: (typeof ramSensor !== "undefined" && ramSensor.value !== undefined && !isNaN(ramSensor.value)) ? Math.round(ramSensor.value) : 42
-    readonly property int sysTemp: (typeof tempSensor !== "undefined" && tempSensor.value !== undefined && !isNaN(tempSensor.value)) ? Math.round(tempSensor.value) : 40
+    property int lastKnownCpuPct: 14
+    property int lastKnownRamPct: 45
+    property int lastKnownTemp: 42
+
+    readonly property int sysCpuPct: {
+        if (typeof cpuSensor !== "undefined" && cpuSensor.value !== undefined && !isNaN(cpuSensor.value) && cpuSensor.value > 0) {
+            root.lastKnownCpuPct = Math.round(cpuSensor.value);
+        }
+        return root.lastKnownCpuPct;
+    }
+    readonly property int sysRamPct: {
+        if (typeof ramSensor !== "undefined" && ramSensor.value !== undefined && !isNaN(ramSensor.value) && ramSensor.value > 0) {
+            root.lastKnownRamPct = Math.round(ramSensor.value);
+        }
+        return root.lastKnownRamPct;
+    }
+    readonly property int sysTemp: {
+        if (typeof tempSensor !== "undefined" && tempSensor.value !== undefined && !isNaN(tempSensor.value) && tempSensor.value > 0) {
+            root.lastKnownTemp = Math.round(tempSensor.value);
+        }
+        return root.lastKnownTemp;
+    }
     property int sysBatteryPct: 100
     property bool sysBatteryCharging: false
 
