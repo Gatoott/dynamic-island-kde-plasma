@@ -175,8 +175,7 @@ Item {
         id: compactSilhouette
         visible: !compactNotchRoot.isFloatingStyle
         anchors.fill: parent
-        layer.enabled: true
-        layer.samples: 4
+        preferredRendererType: Shape.CurveRenderer
 
         // Siluet Bodi Tunggal Living Notch (Border & Stroke dimatikan agar borderless dan menyatu mulus dengan panel)
         ShapePath {
