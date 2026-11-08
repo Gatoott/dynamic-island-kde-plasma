@@ -235,12 +235,13 @@ class CavaRunner:
                             self.service.notify_levels(list(self.smoothed), True)
                         else:
                             self.silent_frames += 1
-                            # Setelah ~40 frame sunyi berturut-turut (~0.7 detik pada 60fps), set active = False
-                            if self.silent_frames > 40:
+                            # Decay perlahan selama 40 frame (~0.7s pada 60fps)
+                            if self.silent_frames <= 40:
+                                self.service.notify_levels(list(self.smoothed), True)
+                            elif self.service.active:
+                                # Kirim status hening tepat sekali, lalu berhenti broadcast sinyal
                                 self.smoothed = [0.0, 0.0, 0.0, 0.0]
                                 self.service.notify_levels([0.0, 0.0, 0.0, 0.0], False)
-                            else:
-                                self.service.notify_levels(list(self.smoothed), True)
                     except ValueError:
                         continue
 
