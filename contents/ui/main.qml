@@ -347,20 +347,31 @@ PlasmoidItem {
     property double lastSyncTimestamp: 0
     property real estimatedTrackPosition: 0
 
+    // 1. One-shot timer dijadwalkan tepat ke timestamp baris lirik berikutnya
     Timer {
-        id: lyricsSyncTimer
-        interval: 100
-        repeat: true
-        running: root.isPlaying && (root.isExpanded || root.showLyrics)
+        id: nextLyricTimer
+        repeat: false
         onTriggered: {
             if (!root.isPlaying) return;
+            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
+            var estPos = root.lastSyncPosition + elapsedSec;
+            root.updateLyricProgress(estPos);
+        }
+    }
+
+    // 2. Timer update progress bar slider kartu media (HANYA saat dialog expanded terbuka)
+    Timer {
+        id: expandedProgressTimer
+        interval: 250
+        repeat: true
+        running: root.isPlaying && root.isExpanded
+        onTriggered: {
             var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
             var estPos = root.lastSyncPosition + elapsedSec;
             if (root.trackLength > 0 && estPos > root.trackLength) {
                 estPos = root.trackLength;
             }
             root.estimatedTrackPosition = estPos;
-            root.updateLyricProgress(estPos);
         }
     }
 
@@ -374,6 +385,7 @@ PlasmoidItem {
         estimatedTrackPosition = 0;
         retryCount = 0;
         retryLyricsTimer.stop();
+        nextLyricTimer.stop();
         if (trackTitle && trackTitle.length > 0) {
             fetchLyrics(true);
         }
@@ -389,6 +401,7 @@ PlasmoidItem {
         estimatedTrackPosition = 0;
         retryCount = 0;
         retryLyricsTimer.stop();
+        nextLyricTimer.stop();
         if (trackTitle && trackTitle.length > 0) {
             fetchLyrics(true);
         }
@@ -397,6 +410,18 @@ PlasmoidItem {
     onShowLyricsChanged: {
         if (showLyrics && (!lyricsList || lyricsList.length === 0)) {
             fetchLyrics(true);
+        } else if (showLyrics) {
+            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
+            updateLyricProgress(root.lastSyncPosition + elapsedSec);
+        }
+    }
+
+    onIsExpandedChanged: {
+        if (isExpanded) {
+            var elapsedSec = (Date.now() - root.lastSyncTimestamp) / 1000.0;
+            var estPos = root.lastSyncPosition + elapsedSec;
+            root.estimatedTrackPosition = estPos;
+            updateLyricProgress(estPos);
         }
     }
 
@@ -411,8 +436,8 @@ PlasmoidItem {
         lastSyncPosition = trackPosition;
         lastSyncTimestamp = Date.now();
         estimatedTrackPosition = trackPosition;
-        if (isPlaying) {
-            lyricsSyncTimer.restart();
+        if (!isPlaying) {
+            nextLyricTimer.stop();
         }
         updateLyricProgress(trackPosition);
 
@@ -423,18 +448,42 @@ PlasmoidItem {
     }
 
     function updateLyricProgress(pos) {
-        if (!lyricsList || lyricsList.length === 0) return;
+        if (!lyricsList || lyricsList.length === 0) {
+            nextLyricTimer.stop();
+            return;
+        }
+
+        // Cari index baris lirik saat ini secara efisien
         var idx = -1;
-        for (var i = 0; i < lyricsList.length; i++) {
+        var startI = (currentLyricIndex >= 0 && currentLyricIndex < lyricsList.length && lyricsList[currentLyricIndex].time <= pos)
+            ? currentLyricIndex : 0;
+
+        for (var i = startI; i < lyricsList.length; i++) {
             if (lyricsList[i].time <= pos) {
                 idx = i;
             } else {
                 break;
             }
         }
+
         if (idx !== currentLyricIndex) {
             currentLyricIndex = idx;
             currentLyricLine = (idx >= 0 && idx < lyricsList.length) ? lyricsList[idx].text : "";
+        }
+
+        // Jadwalkan timer sekali-jalan tepat pada waktu baris lirik berikutnya
+        if (root.isPlaying && (root.isExpanded || root.showLyrics)) {
+            var nextIdx = idx + 1;
+            if (nextIdx < lyricsList.length) {
+                var timeRemaining = lyricsList[nextIdx].time - pos;
+                var delayMs = Math.max(25, Math.round(timeRemaining * 1000));
+                nextLyricTimer.interval = delayMs;
+                nextLyricTimer.restart();
+            } else {
+                nextLyricTimer.stop();
+            }
+        } else {
+            nextLyricTimer.stop();
         }
     }
 
@@ -970,7 +1019,7 @@ PlasmoidItem {
         }
     }
 
-    // 4. Periodic Polling & D-Bus Fallback (interval 6000ms - HANYA update angka pasif)
+    // 4. Periodic Polling & D-Bus Fallback (interval 60000ms - Safety net pasif santai)
     DBusCall {
         id: dbusBatteryGet
         busType: DBus.BusType.System
@@ -982,7 +1031,7 @@ PlasmoidItem {
 
     Timer {
         id: batteryPollTimer
-        interval: 6000
+        interval: 60000
         running: true
         repeat: true
         triggeredOnStart: false
