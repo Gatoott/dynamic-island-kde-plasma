@@ -1022,6 +1022,11 @@ PlasmoidItem {
                 visualizerHeartbeatTimer.restart();
             }
         }
+
+        function dbusSetExpanded(expanded) {
+            if (expanded) root.openNotch(0);
+            else root.closeNotch();
+        }
     }
 
     DBus.Properties {

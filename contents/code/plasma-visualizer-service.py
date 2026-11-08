@@ -114,6 +114,15 @@ class VisualizerService(dbus.service.Object):
     def LevelsChanged(self, levels, active):
         pass
 
+    @dbus.service.signal(IFACE, signature="b")
+    def SetExpanded(self, expanded):
+        pass
+
+    @dbus.service.method(IFACE, in_signature="b", out_signature="b")
+    def RequestExpanded(self, expanded):
+        self.SetExpanded(bool(expanded))
+        return True
+
     @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
     def PropertiesChanged(self, interface_name, changed_properties, invalidated_properties):
         pass
