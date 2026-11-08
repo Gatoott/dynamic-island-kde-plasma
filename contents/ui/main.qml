@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Shapes
+import QtQuick.Window
 import org.kde.plasma.plasmoid
 import org.kde.plasma.core as PlasmaCore
 import org.kde.kirigami as Kirigami
@@ -1332,6 +1333,17 @@ PlasmoidItem {
         }
     }
 
+    function getHostScreen() {
+        var screenList = (typeof Application !== "undefined" && Application.screens) ? Application.screens : (Qt.application ? Qt.application.screens : []);
+        var targetName = (root.Screen && root.Screen.name) ? root.Screen.name : (root.Window.window && root.Window.window.screen ? root.Window.window.screen.name : "");
+        for (var i = 0; i < screenList.length; i++) {
+            if (screenList[i].name === targetName) {
+                return screenList[i];
+            }
+        }
+        return (root.Window.window && root.Window.window.screen) ? root.Window.window.screen : null;
+    }
+
     function openNotch(targetTabIndex) {
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
@@ -1362,6 +1374,17 @@ PlasmoidItem {
         }
 
         if (root.inPanel) {
+            var panelWin = root.Window.window;
+            var hostScrn = root.getHostScreen();
+            if (hostScrn && expandedDialog.screen !== hostScrn) {
+                expandedDialog.screen = hostScrn;
+            }
+            if (panelWin && panelWin.screenToFollow) {
+                try {
+                    expandedDialog.LayerShellQt.Window.screen = panelWin.screenToFollow;
+                } catch (e) {}
+            }
+
             // Set geometri awal persis sama dengan kapsul standby di panel
             card.targetW = startW;
             card.targetH = startH;
@@ -1508,6 +1531,7 @@ PlasmoidItem {
     // ==============================================================
     Window {
         id: expandedDialog
+        screen: root.getHostScreen()
         width: 720
         height: 520
         color: "transparent"
@@ -1519,6 +1543,9 @@ PlasmoidItem {
         LayerShellQt.Window.scope: "dynamic-island"
         LayerShellQt.Window.exclusionZone: -1
         LayerShellQt.Window.keyboardInteractivity: LayerShellQt.Window.KeyboardInteractivityOnDemand
+        LayerShellQt.Window.screenConfiguration: LayerShellQt.Window.ScreenFromQWindow
+        LayerShellQt.Window.screen: (root.Window.window && root.Window.window.screenToFollow) ? root.Window.window.screenToFollow : null
+        LayerShellQt.Window.wantsToBeOnActiveScreen: false
 
         onActiveChanged: {
             if (!active && root.isExpanded && !expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
