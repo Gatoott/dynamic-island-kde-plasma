@@ -63,6 +63,7 @@ Item {
     // Real audio levels dari service D-Bus (array of 4 floats: 0.0 .. 1.0)
     property var levels: (typeof root !== "undefined" && root.visualizerLevels) ? root.visualizerLevels : []
     property bool realAudioActive: (typeof root !== "undefined" && root.visualizerServiceActive) ? root.visualizerServiceActive : false
+    readonly property bool isEffectivelyVisible: visible && opacity > 0 && (Window.window ? Window.window.visible : true)
 
     property color barColor: {
         if (colorMode === 0 && albumColor && albumColor != "" && albumColor != "#000000") {
@@ -102,20 +103,22 @@ Item {
 
                 // Nilai level real audio (0.0 .. 1.0) dari cava / D-Bus
                 readonly property real currentLevel: {
-                    if (!visualizerRoot.levels || visualizerRoot.levels.length <= index) return 0.0;
+                    if (!visualizerRoot.isEffectivelyVisible || !visualizerRoot.levels || visualizerRoot.levels.length <= index) return 0.0;
                     var item = visualizerRoot.levels[index];
                     var val = (typeof item === "object" && item !== null && item.value !== undefined) ? Number(item.value) : Number(item);
                     return isNaN(val) ? 0.0 : Math.max(0.0, Math.min(1.0, val));
                 }
 
                 // Tinggi berbasis desibel audio sesungguhnya saat service aktif
-                readonly property real realTargetHeight: visualizerRoot.minHeight + Math.max(0.0, Math.min(1.0, currentLevel)) * (visualizerRoot.maxHeight - visualizerRoot.minHeight)
+                readonly property real realTargetHeight: visualizerRoot.isEffectivelyVisible
+                    ? (visualizerRoot.minHeight + Math.max(0.0, Math.min(1.0, currentLevel)) * (visualizerRoot.maxHeight - visualizerRoot.minHeight))
+                    : visualizerRoot.minHeight
 
                 // Tinggi animasi sintetis bawaan (fallback saat cava/service tidak aktif)
                 property real dummyHeight: visualizerRoot.minHeight
 
                 SequentialAnimation on dummyHeight {
-                    running: !visualizerRoot.realAudioActive && visualizerRoot.isPlaying && visualizerRoot.visible && visualizerRoot.opacity > 0
+                    running: visualizerRoot.isEffectivelyVisible && !visualizerRoot.realAudioActive && visualizerRoot.isPlaying
                     loops: Animation.Infinite
 
                     NumberAnimation {
@@ -140,10 +143,10 @@ Item {
                     }
                 }
 
-                height: visualizerRoot.realAudioActive ? realTargetHeight : dummyHeight
+                height: (visualizerRoot.isEffectivelyVisible && visualizerRoot.realAudioActive) ? realTargetHeight : dummyHeight
 
                 Behavior on height {
-                    enabled: visualizerRoot.realAudioActive || !visualizerRoot.isPlaying
+                    enabled: visualizerRoot.isEffectivelyVisible && (visualizerRoot.realAudioActive || !visualizerRoot.isPlaying)
                     NumberAnimation {
                         duration: visualizerRoot.realAudioActive ? 70 : 200
                         easing.type: visualizerRoot.realAudioActive ? Easing.OutQuad : Easing.OutCubic

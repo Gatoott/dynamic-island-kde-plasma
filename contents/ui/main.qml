@@ -1281,7 +1281,7 @@ PlasmoidItem {
     // ==============================================================
     Item {
         id: panelNotchContainer
-        visible: root.inPanel // Kapsul standby selalu aktif di scene graph saat di panel
+        visible: root.inPanel && (root.compactVisible || !root.isExpanded)
         width: panelCompactNotch.width
         height: root.cfgCompactHeight
 
