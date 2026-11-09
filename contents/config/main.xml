@@ -155,6 +155,12 @@
     <entry name="showNotificationTab" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="showCalendarTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="calendarFirstDayOfWeek" type="Int">
+      <default>1</default>
+    </entry>
 
     <!-- Typography Customization -->
     <entry name="clockFontFamily" type="String">

@@ -62,6 +62,8 @@ PlasmoidItem {
     readonly property bool cfgShowMediaTab: Plasmoid.configuration.showMediaTab !== undefined ? Plasmoid.configuration.showMediaTab : true
     readonly property bool cfgShowClipboardTab: Plasmoid.configuration.showClipboardTab !== undefined ? Plasmoid.configuration.showClipboardTab : true
     readonly property bool cfgShowNotificationTab: Plasmoid.configuration.showNotificationTab !== undefined ? Plasmoid.configuration.showNotificationTab : true
+    readonly property bool cfgShowCalendarTab: Plasmoid.configuration.showCalendarTab !== undefined ? Plasmoid.configuration.showCalendarTab : true
+    readonly property int cfgCalendarFirstDayOfWeek: Plasmoid.configuration.calendarFirstDayOfWeek !== undefined ? Plasmoid.configuration.calendarFirstDayOfWeek : 1
     readonly property string cfgClockFontFamily: {
         var f = Plasmoid.configuration.clockFontFamily;
         return (f && f !== "Default (Inter/Roboto)") ? f : "";
@@ -1605,6 +1607,8 @@ PlasmoidItem {
                 showMediaTab: root.cfgShowMediaTab
                 showClipboardTab: root.cfgShowClipboardTab
                 showNotificationTab: root.cfgShowNotificationTab
+                showCalendarTab: root.cfgShowCalendarTab
+                calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
 
                 cfgClockFontFamily: root.cfgClockFontFamily
                 cfgClockFontBold: root.cfgClockFontBold
@@ -1757,6 +1761,8 @@ PlasmoidItem {
         showMediaTab: root.cfgShowMediaTab
         showClipboardTab: root.cfgShowClipboardTab
         showNotificationTab: root.cfgShowNotificationTab
+        showCalendarTab: root.cfgShowCalendarTab
+        calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
 
         cfgClockFontFamily: root.cfgClockFontFamily
         cfgClockFontBold: root.cfgClockFontBold

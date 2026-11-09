@@ -39,11 +39,14 @@ Item {
     property bool showMediaTab: true
     property bool showClipboardTab: true
     property bool showNotificationTab: true
+    property bool showCalendarTab: true
+    property int calendarFirstDayOfWeek: 1
 
     readonly property var availableTabs: {
         var tabs = [];
         if (showMediaTab) tabs.push("media");
         if (showNotificationTab) tabs.push("notification");
+        if (showCalendarTab) tabs.push("calendar");
         if (showControlTab) tabs.push("control");
         if (showClipboardTab) tabs.push("clipboard");
         if (tabs.length === 0) tabs.push("media");
@@ -779,6 +782,7 @@ Item {
                         switch (unifiedNotchRoot.activeTabKey) {
                             case "media": return mediaLyricsComponent;
                             case "notification": return notificationHistoryComponent;
+                            case "calendar": return calendarComponent;
                             case "control": return controlCenterComponent;
                             case "clipboard": return clipboardComponent;
                             default: return mediaLyricsComponent;
@@ -887,6 +891,17 @@ Item {
                         notificationItems: unifiedNotchRoot.notificationHistory
                         onRequestClearAll: unifiedNotchRoot.requestClearAllNotifications()
                         onRequestRemoveItem: (id) => unifiedNotchRoot.requestRemoveNotification(id)
+                    }
+                }
+
+                // Tab: Kalender
+                Component {
+                    id: calendarComponent
+                    CalendarCard {
+                        anchors.fill: parent
+                        accentColor: unifiedNotchRoot.cfgAccentColor
+                        firstDayOfWeek: unifiedNotchRoot.calendarFirstDayOfWeek
+                        clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
                     }
                 }
             }

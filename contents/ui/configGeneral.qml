@@ -105,6 +105,8 @@ KCM.SimpleKCM {
     property alias cfg_showNotificationTab: showNotificationTabCheck.checked
     property alias cfg_showControlTab: showControlTabCheck.checked
     property alias cfg_showClipboardTab: showClipboardTabCheck.checked
+    property alias cfg_showCalendarTab: showCalendarTabCheck.checked
+    property alias cfg_calendarFirstDayOfWeek: calendarFirstDayOfWeekCombo.currentIndex
 
     readonly property var systemFonts: ["Default (Inter/Roboto)"].concat(Qt.fontFamilies())
 
@@ -771,6 +773,20 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Tab Riwayat Clipboard:")
             text: i18n("Aktifkan Tab Pengelola Clipboard (Klipper)")
             checked: true
+        }
+
+        QQC2.CheckBox {
+            id: showCalendarTabCheck
+            Kirigami.FormData.label: i18n("Tab Kalender:")
+            text: i18n("Aktifkan Tab Kalender")
+            checked: true
+        }
+
+        QQC2.ComboBox {
+            id: calendarFirstDayOfWeekCombo
+            Kirigami.FormData.label: i18n("Awal Pekan Kalender:")
+            model: [i18n("Minggu (Sunday)"), i18n("Senin (Monday - Default)")]
+            currentIndex: 1
         }
     }
 }
