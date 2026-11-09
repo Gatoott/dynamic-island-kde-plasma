@@ -31,6 +31,10 @@ TIMER_IFACE = "org.kde.plasma.dynamicisland.timer"
 TIMER_PATH = "/Timer"
 TIMER_STATE_FILE = os.path.join(CONFIG_DIR, "timer_state.json")
 
+EYE_IFACE = "org.kde.plasma.dynamicisland.eyecare"
+EYE_PATH = "/EyeCare"
+EYE_STATE_FILE = os.path.join(CONFIG_DIR, "eyecare_state.json")
+
 def ensure_cava_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     content = """## Dedicated cava config for Plasma Dynamic Island
@@ -444,6 +448,373 @@ class TimerService(dbus.service.Object):
         pass
 
 
+class EyeCareService(dbus.service.Object):
+    def __init__(self, session_bus, system_bus=None):
+        bus_name = dbus.service.BusName(EYE_IFACE, session_bus)
+        super().__init__(bus_name, EYE_PATH)
+        self.session_bus = session_bus
+        self.system_bus = system_bus
+        self._lock = threading.Lock()
+
+        self.state = "idle" # idle, running, break
+        self.interval_minutes = 20
+        self.remaining_seconds = 1200
+        self.break_duration = 20 # aturan 20-20-20 (20 detik)
+        self.time_since_last_break = 0 # akumulasi detik layar aktif sejak istirahat terakhir
+        self.last_break_time = time.time()
+        self.is_overdue = False
+        self.is_screen_locked = False
+        self.is_sleeping = False
+        self.is_paused = False
+        self._timer_source_id = None
+        self._save_counter = 0
+
+        self._setup_lock_and_sleep_listeners()
+        self._load_state()
+
+    def _setup_lock_and_sleep_listeners(self):
+        # 1. ScreenSaver lock screen signal
+        try:
+            self.session_bus.add_signal_receiver(
+                self._on_screensaver_active_changed,
+                signal_name="ActiveChanged",
+                dbus_interface="org.freedesktop.ScreenSaver"
+            )
+            try:
+                ss_obj = self.session_bus.get_object("org.freedesktop.ScreenSaver", "/ScreenSaver")
+                ss_iface = dbus.Interface(ss_obj, "org.freedesktop.ScreenSaver")
+                self.is_screen_locked = bool(ss_iface.GetActive())
+            except Exception:
+                self.is_screen_locked = False
+        except Exception as e:
+            print("[EyeCare] Gagal pasang listener ScreenSaver:", e, flush=True)
+
+        # 2. Login1 sleep/suspend signal
+        if self.system_bus:
+            try:
+                self.system_bus.add_signal_receiver(
+                    self._on_prepare_for_sleep,
+                    signal_name="PrepareForSleep",
+                    dbus_interface="org.freedesktop.login1.Manager"
+                )
+            except Exception as e:
+                print("[EyeCare] Gagal pasang listener login1 PrepareForSleep:", e, flush=True)
+
+    def _on_screensaver_active_changed(self, active):
+        with self._lock:
+            self.is_screen_locked = bool(active)
+            self._update_paused_state()
+            print(f"[EyeCare] Layar terkunci: {self.is_screen_locked}", flush=True)
+        self._emit_updated()
+
+    def _on_prepare_for_sleep(self, going_to_sleep):
+        with self._lock:
+            self.is_sleeping = bool(going_to_sleep)
+            self._update_paused_state()
+            print(f"[EyeCare] Sleep/Suspend state: {self.is_sleeping}", flush=True)
+        self._emit_updated()
+
+    def _update_paused_state(self):
+        self.is_paused = self.is_screen_locked or self.is_sleeping
+
+    def _load_state(self):
+        if not os.path.exists(EYE_STATE_FILE):
+            return
+        try:
+            with open(EYE_STATE_FILE, "r") as f:
+                data = json.load(f)
+            self.interval_minutes = int(data.get("interval_minutes", 20))
+            self.state = data.get("state", "idle")
+            self.remaining_seconds = int(data.get("remaining_seconds", self.interval_minutes * 60))
+            self.time_since_last_break = int(data.get("time_since_last_break", 0))
+            self.last_break_time = float(data.get("last_break_time", time.time()))
+            self.is_overdue = (self.time_since_last_break > (self.interval_minutes * 60))
+
+            if self.state in ("running", "break"):
+                self._start_timer_loop()
+        except Exception as e:
+            print("[EyeCare] Gagal memuat state:", e, flush=True)
+
+    def _save_state(self):
+        try:
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            data = {
+                "state": self.state,
+                "interval_minutes": self.interval_minutes,
+                "remaining_seconds": self.remaining_seconds,
+                "time_since_last_break": self.time_since_last_break,
+                "last_break_time": self.last_break_time
+            }
+            tmp = EYE_STATE_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp, EYE_STATE_FILE)
+        except Exception as e:
+            print("[EyeCare] Gagal menyimpan state:", e, flush=True)
+
+    def _start_timer_loop(self):
+        if self._timer_source_id is not None:
+            GLib.source_remove(self._timer_source_id)
+        self._timer_source_id = GLib.timeout_add(1000, self._on_tick)
+
+    def _stop_timer_loop(self):
+        if self._timer_source_id is not None:
+            GLib.source_remove(self._timer_source_id)
+            self._timer_source_id = None
+
+    def _on_tick(self):
+        with self._lock:
+            if self.state not in ("running", "break"):
+                self._timer_source_id = None
+                return False
+
+            # Jika layar terkunci atau laptop sleep: JEDA WAKTU LAYAR!
+            if self.is_screen_locked or self.is_sleeping:
+                if not self.is_paused:
+                    self.is_paused = True
+                    self._emit_updated()
+                return True
+
+            if self.is_paused:
+                self.is_paused = False
+
+            if self.state == "running":
+                self.time_since_last_break += 1
+                self.remaining_seconds -= 1
+                self.is_overdue = (self.time_since_last_break > (self.interval_minutes * 60))
+
+                if self.remaining_seconds <= 0:
+                    # Masuk waktu istirahat 20 detik!
+                    self.state = "break"
+                    self.remaining_seconds = self.break_duration
+                    self._trigger_break_notification()
+
+            elif self.state == "break":
+                self.remaining_seconds -= 1
+                if self.remaining_seconds <= 0:
+                    # Istirahat 20 detik selesai! Mulai siklus baru otomatis
+                    self._trigger_break_finished()
+                    self.state = "running"
+                    self.remaining_seconds = self.interval_minutes * 60
+                    self.time_since_last_break = 0
+                    self.last_break_time = time.time()
+                    self.is_overdue = False
+
+            self._save_counter += 1
+            if self._save_counter >= 5:
+                self._save_counter = 0
+                self._save_state()
+
+        self._emit_updated()
+        return True
+
+    def _trigger_break_notification(self):
+        def _fire():
+            try:
+                self.BreakStarted(dbus.Int32(self.break_duration))
+            except Exception:
+                pass
+
+            sound_file = "/usr/share/sounds/ocean/stereo/bell.oga"
+            if not os.path.exists(sound_file):
+                sound_file = "/usr/share/sounds/freedesktop/stereo/bell.oga"
+            if shutil.which("pw-play") and os.path.exists(sound_file):
+                try:
+                    subprocess.Popen(["pw-play", sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+            elif shutil.which("canberra-gtk-play"):
+                try:
+                    subprocess.Popen(["canberra-gtk-play", "-i", "bell"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
+            if shutil.which("notify-send"):
+                try:
+                    subprocess.Popen([
+                        "notify-send",
+                        "-a", "Dynamic Island",
+                        "-i", "view-visible",
+                        "-u", "normal",
+                        "Waktunya Istirahat Mata!",
+                        "Istirahatkan matamu, lihat jauh selama 20 detik (Aturan 20-20-20)."
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
+        GLib.idle_add(_fire)
+
+    def _trigger_break_finished(self):
+        def _fire():
+            try:
+                self.BreakFinished()
+            except Exception:
+                pass
+
+            sound_file = "/usr/share/sounds/ocean/stereo/complete-media-burn.oga"
+            if not os.path.exists(sound_file):
+                sound_file = "/usr/share/sounds/freedesktop/stereo/complete.oga"
+            if shutil.which("pw-play") and os.path.exists(sound_file):
+                try:
+                    subprocess.Popen(["pw-play", sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+            elif shutil.which("canberra-gtk-play"):
+                try:
+                    subprocess.Popen(["canberra-gtk-play", "-i", "complete"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
+        GLib.idle_add(_fire)
+
+    def _emit_updated(self):
+        def _fire():
+            try:
+                self.EyeUpdated(
+                    dbus.String(self.state),
+                    dbus.Int32(self.remaining_seconds),
+                    dbus.Int32(self.time_since_last_break),
+                    dbus.Boolean(self.is_overdue),
+                    dbus.Boolean(self.is_paused)
+                )
+
+                changed = dbus.Dictionary({
+                    dbus.String("state"): dbus.String(self.state, variant_level=1),
+                    dbus.String("intervalMinutes"): dbus.Int32(self.interval_minutes, variant_level=1),
+                    dbus.String("remainingSeconds"): dbus.Int32(self.remaining_seconds, variant_level=1),
+                    dbus.String("breakDuration"): dbus.Int32(self.break_duration, variant_level=1),
+                    dbus.String("timeSinceLastBreak"): dbus.Int32(self.time_since_last_break, variant_level=1),
+                    dbus.String("isOverdue"): dbus.Boolean(self.is_overdue, variant_level=1),
+                    dbus.String("isPaused"): dbus.Boolean(self.is_paused, variant_level=1)
+                }, signature="sv")
+                self.PropertiesChanged(EYE_IFACE, changed, dbus.Array([], signature="s"))
+            except Exception:
+                pass
+        GLib.idle_add(_fire)
+
+    # --- D-Bus Methods ---
+    @dbus.service.method(EYE_IFACE, in_signature="i", out_signature="b")
+    def Start(self, interval_minutes):
+        mins = int(interval_minutes)
+        if mins <= 0:
+            mins = self.interval_minutes
+        with self._lock:
+            self.interval_minutes = mins
+            self.state = "running"
+            self.remaining_seconds = mins * 60
+            self._save_state()
+            self._start_timer_loop()
+        self._emit_updated()
+        print(f"[EyeCare] Dimulai dengan interval: {mins} menit", flush=True)
+        return True
+
+    @dbus.service.method(EYE_IFACE, out_signature="b")
+    def Stop(self):
+        with self._lock:
+            self.state = "idle"
+            self.remaining_seconds = self.interval_minutes * 60
+            self._stop_timer_loop()
+            self._save_state()
+        self._emit_updated()
+        print("[EyeCare] Dihentikan", flush=True)
+        return True
+
+    @dbus.service.method(EYE_IFACE, in_signature="i", out_signature="b")
+    def Snooze(self, snooze_minutes):
+        mins = int(snooze_minutes) if snooze_minutes > 0 else 5
+        with self._lock:
+            self.state = "running"
+            self.remaining_seconds = mins * 60
+            self.is_overdue = (self.time_since_last_break > (self.interval_minutes * 60))
+            self._save_state()
+            self._start_timer_loop()
+        self._emit_updated()
+        print(f"[EyeCare] Ditunda {mins} menit (total aktif: {self.time_since_last_break} detik)", flush=True)
+        return True
+
+    @dbus.service.method(EYE_IFACE, out_signature="b")
+    def SkipBreak(self):
+        with self._lock:
+            self.state = "running"
+            self.remaining_seconds = self.interval_minutes * 60
+            self.time_since_last_break = 0
+            self.last_break_time = time.time()
+            self.is_overdue = False
+            self._save_state()
+            self._start_timer_loop()
+        self._emit_updated()
+        print("[EyeCare] Istirahat dilewati, siklus baru dimulai", flush=True)
+        return True
+
+    @dbus.service.method(EYE_IFACE, out_signature="b")
+    def TriggerBreak(self):
+        with self._lock:
+            self.state = "break"
+            self.remaining_seconds = self.break_duration
+            self._save_state()
+            self._start_timer_loop()
+            self._trigger_break_notification()
+        self._emit_updated()
+        print(f"[EyeCare] Sesi rehat 20 detik dipicu secara manual", flush=True)
+        return True
+
+    @dbus.service.method(EYE_IFACE, in_signature="i", out_signature="b")
+    def SetInterval(self, minutes):
+        mins = int(minutes)
+        if mins <= 0:
+            return False
+        with self._lock:
+            self.interval_minutes = mins
+            if self.state == "idle":
+                self.remaining_seconds = mins * 60
+            self._save_state()
+        self._emit_updated()
+        return True
+
+    # --- Properties Interface ---
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        with self._lock:
+            if prop == "state": return dbus.String(self.state)
+            elif prop == "intervalMinutes": return dbus.Int32(self.interval_minutes)
+            elif prop == "remainingSeconds": return dbus.Int32(self.remaining_seconds)
+            elif prop == "breakDuration": return dbus.Int32(self.break_duration)
+            elif prop == "timeSinceLastBreak": return dbus.Int32(self.time_since_last_break)
+            elif prop == "isOverdue": return dbus.Boolean(self.is_overdue)
+            elif prop == "isPaused": return dbus.Boolean(self.is_paused)
+        return dbus.String("")
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        with self._lock:
+            return dbus.Dictionary({
+                dbus.String("state"): dbus.String(self.state, variant_level=1),
+                dbus.String("intervalMinutes"): dbus.Int32(self.interval_minutes, variant_level=1),
+                dbus.String("remainingSeconds"): dbus.Int32(self.remaining_seconds, variant_level=1),
+                dbus.String("breakDuration"): dbus.Int32(self.break_duration, variant_level=1),
+                dbus.String("timeSinceLastBreak"): dbus.Int32(self.time_since_last_break, variant_level=1),
+                dbus.String("isOverdue"): dbus.Boolean(self.is_overdue, variant_level=1),
+                dbus.String("isPaused"): dbus.Boolean(self.is_paused, variant_level=1)
+            }, signature="sv")
+
+    # --- Signals ---
+    @dbus.service.signal(EYE_IFACE, signature="siibb")
+    def EyeUpdated(self, state, remaining_seconds, time_since_last_break, is_overdue, is_paused):
+        pass
+
+    @dbus.service.signal(EYE_IFACE, signature="i")
+    def BreakStarted(self, break_duration):
+        pass
+
+    @dbus.service.signal(EYE_IFACE)
+    def BreakFinished(self):
+        pass
+
+    @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
+    def PropertiesChanged(self, interface_name, changed_properties, invalidated_properties):
+        pass
+
+
 class CavaRunner:
     def __init__(self, service):
         self.service = service
@@ -555,8 +926,15 @@ class CavaRunner:
 def main():
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
+    sys_bus = None
+    try:
+        sys_bus = dbus.SystemBus()
+    except Exception as e:
+        print("[EyeCare] System bus tidak dapat diakses:", e, flush=True)
+
     service = VisualizerService(bus)
     timer_service = TimerService(bus)
+    eye_service = EyeCareService(bus, sys_bus)
     runner = CavaRunner(service)
 
     def on_set_playing(is_playing):
@@ -574,6 +952,7 @@ def main():
         print(f"\n[DynamicIsland] Menghentikan service (signal {sig})...", flush=True)
         runner.stop()
         timer_service._stop_timer_loop()
+        eye_service._stop_timer_loop()
         loop.quit()
 
     signal.signal(signal.SIGINT, handle_signal)
@@ -581,6 +960,7 @@ def main():
 
     print(f"[Visualizer] Service aktif pada D-Bus: {IFACE} di {PATH}", flush=True)
     print(f"[Timer] Service aktif pada D-Bus: {TIMER_IFACE} di {TIMER_PATH}", flush=True)
+    print(f"[EyeCare] Service aktif pada D-Bus: {EYE_IFACE} di {EYE_PATH}", flush=True)
     try:
         loop.run()
     except KeyboardInterrupt:

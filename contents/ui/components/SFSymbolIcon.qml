@@ -262,6 +262,22 @@ Canvas {
             ctx.moveTo(w * 0.5 + sOff, h * 0.5 - sOff);
             ctx.lineTo(w * 0.5 - sOff, h * 0.5 + sOff);
             ctx.stroke();
+        } else if (name === "eye" || name === "eye.fill") {
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            ctx.beginPath();
+            ctx.moveTo(w * 0.10, h * 0.50);
+            ctx.quadraticCurveTo(w * 0.50, h * 0.16, w * 0.90, h * 0.50);
+            ctx.quadraticCurveTo(w * 0.50, h * 0.84, w * 0.10, h * 0.50);
+            ctx.stroke();
+
+            ctx.fillStyle = iconCanvas.color;
+            ctx.beginPath();
+            ctx.arc(w * 0.50, h * 0.50, w * 0.18, 0, Math.PI * 2);
+            ctx.fill();
         }
     }
 }

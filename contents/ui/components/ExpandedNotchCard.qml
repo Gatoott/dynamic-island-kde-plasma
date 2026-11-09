@@ -40,6 +40,7 @@ Item {
     property bool showClipboardTab: true
     property bool showNotificationTab: true
     property bool showTimerTab: true
+    property bool showEyeTab: true
     property bool showCalendarTab: true
     property int calendarFirstDayOfWeek: 1
 
@@ -48,6 +49,7 @@ Item {
         if (showMediaTab) tabs.push("media");
         if (showNotificationTab) tabs.push("notification");
         if (showTimerTab) tabs.push("timer");
+        if (showEyeTab) tabs.push("eye");
         if (showCalendarTab) tabs.push("calendar");
         if (showControlTab) tabs.push("control");
         if (showClipboardTab) tabs.push("clipboard");
@@ -785,6 +787,7 @@ Item {
                             case "media": return mediaLyricsComponent;
                             case "notification": return notificationHistoryComponent;
                             case "timer": return timerComponent;
+                            case "eye": return eyeComponent;
                             case "calendar": return calendarComponent;
                             case "control": return controlCenterComponent;
                             case "clipboard": return clipboardComponent;
@@ -912,6 +915,16 @@ Item {
                 Component {
                     id: timerComponent
                     TimerCard {
+                        anchors.fill: parent
+                        accentColor: unifiedNotchRoot.cfgAccentColor
+                        clockFontFamily: unifiedNotchRoot.cfgClockFontFamily
+                    }
+                }
+
+                // Tab: Pengingat Istirahat Mata (Aturan 20-20-20)
+                Component {
+                    id: eyeComponent
+                    EyeCareCard {
                         anchors.fill: parent
                         accentColor: unifiedNotchRoot.cfgAccentColor
                         clockFontFamily: unifiedNotchRoot.cfgClockFontFamily

@@ -167,6 +167,9 @@
     <entry name="timerSoundEnabled" type="Bool">
       <default>true</default>
     </entry>
+    <entry name="showEyeTab" type="Bool">
+      <default>true</default>
+    </entry>
 
     <!-- Typography Customization -->
     <entry name="clockFontFamily" type="String">

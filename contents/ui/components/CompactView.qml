@@ -148,8 +148,18 @@ Item {
     property int timerTotalDuration: 0
     property real timerTargetTimestamp: 0.0
 
+    property bool eyePillVisible: false
+    property string eyeState: "idle"
+    property int eyeIntervalMinutes: 20
+    property int eyeRemainingSeconds: 1200
+    property int eyeBreakDuration: 20
+    property int eyeTimeSinceLastBreak: 0
+    property bool eyeIsOverdue: false
+    property bool eyeIsPaused: false
+
     signal requestToggle()
     signal requestOpenTimer()
+    signal requestOpenEye()
 
     width: isFloatingStyle ? notchW : (notchW + (effectiveWingR * 2))
     height: notchH
@@ -288,11 +298,29 @@ Item {
             batteryPercent: compactNotchRoot.sysBatteryPct
         }
 
+        // State 2.4: Eye Care Pill (Break Reminder & Overdue Warning)
+        EyePill {
+            anchors.fill: parent
+            visible: opacity > 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && compactNotchRoot.eyePillVisible) ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 160 } }
+            accentColor: compactNotchRoot.cfgAccentColor
+            clockFontFamily: compactNotchRoot.cfgClockFontFamily
+            eyeState: compactNotchRoot.eyeState
+            intervalMinutes: compactNotchRoot.eyeIntervalMinutes
+            remainingSeconds: compactNotchRoot.eyeRemainingSeconds
+            breakDuration: compactNotchRoot.eyeBreakDuration
+            timeSinceLastBreak: compactNotchRoot.eyeTimeSinceLastBreak
+            isOverdue: compactNotchRoot.eyeIsOverdue
+            isPaused: compactNotchRoot.eyeIsPaused
+            onRequestOpenEye: compactNotchRoot.requestOpenEye()
+        }
+
         // State 2.5: Timer Pill (Active Countdown & Finished Alert)
         TimerPill {
             anchors.fill: parent
             visible: opacity > 0
-            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && compactNotchRoot.timerPillVisible) ? 1 : 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.eyePillVisible && compactNotchRoot.timerPillVisible) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             accentColor: compactNotchRoot.cfgAccentColor
             clockFontFamily: compactNotchRoot.cfgClockFontFamily
@@ -307,7 +335,7 @@ Item {
         LyricsPillView {
             anchors.fill: parent
             visible: opacity > 0
-            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.timerPillVisible && compactNotchRoot.showPillLyrics) ? 1 : 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.eyePillVisible && !compactNotchRoot.timerPillVisible && compactNotchRoot.showPillLyrics) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             currentLyricLine: compactNotchRoot.currentLyricLine
             trackTitle: compactNotchRoot.trackTitle
@@ -341,7 +369,7 @@ Item {
         StandbyView {
             anchors.fill: parent
             visible: opacity > 0
-            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.timerPillVisible && !compactNotchRoot.showPillLyrics) ? 1 : 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.eyePillVisible && !compactNotchRoot.timerPillVisible && !compactNotchRoot.showPillLyrics) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             isPlaying: compactNotchRoot.isPlaying
             currentTimeString: compactNotchRoot.currentTimeString
@@ -373,6 +401,7 @@ Item {
         MouseArea {
             anchors.fill: parent
             cursorShape: Qt.PointingHandCursor
+            enabled: !compactNotchRoot.timerPillVisible && !compactNotchRoot.eyePillVisible
             onClicked: compactNotchRoot.requestToggle()
         }
     }

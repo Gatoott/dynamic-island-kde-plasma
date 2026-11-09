@@ -109,6 +109,7 @@ KCM.SimpleKCM {
     property alias cfg_calendarFirstDayOfWeek: calendarFirstDayOfWeekCombo.currentIndex
     property alias cfg_showTimerTab: showTimerTabCheck.checked
     property alias cfg_timerSoundEnabled: timerSoundEnabledCheck.checked
+    property alias cfg_showEyeTab: showEyeTabCheck.checked
 
     readonly property var systemFonts: ["Default (Inter/Roboto)"].concat(Qt.fontFamilies())
 
@@ -802,6 +803,13 @@ KCM.SimpleKCM {
             id: timerSoundEnabledCheck
             Kirigami.FormData.label: i18n("Suara Timer:")
             text: i18n("Putar Suara Alarm Saat Timer Selesai")
+            checked: true
+        }
+
+        QQC2.CheckBox {
+            id: showEyeTabCheck
+            Kirigami.FormData.label: i18n("Tab Istirahat Mata:")
+            text: i18n("Aktifkan Tab Pengingat Mata (Aturan 20-20-20)")
             checked: true
         }
     }

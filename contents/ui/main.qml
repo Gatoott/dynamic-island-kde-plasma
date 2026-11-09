@@ -66,6 +66,7 @@ PlasmoidItem {
     readonly property int cfgCalendarFirstDayOfWeek: Plasmoid.configuration.calendarFirstDayOfWeek !== undefined ? Plasmoid.configuration.calendarFirstDayOfWeek : 1
     readonly property bool cfgShowTimerTab: Plasmoid.configuration.showTimerTab !== undefined ? Plasmoid.configuration.showTimerTab : true
     readonly property bool cfgTimerSoundEnabled: Plasmoid.configuration.timerSoundEnabled !== undefined ? Plasmoid.configuration.timerSoundEnabled : true
+    readonly property bool cfgShowEyeTab: Plasmoid.configuration.showEyeTab !== undefined ? Plasmoid.configuration.showEyeTab : true
     readonly property string cfgClockFontFamily: {
         var f = Plasmoid.configuration.clockFontFamily;
         return (f && f !== "Default (Inter/Roboto)") ? f : "";
@@ -176,11 +177,30 @@ PlasmoidItem {
         return (root.timerState === "running" || root.timerState === "paused");
     }
 
+    // --- Eye Care State (D-Bus synchronized across multi-monitor) ---
+    property string eyeState: "idle" // "idle", "running", "break"
+    property int eyeIntervalMinutes: 20
+    property int eyeRemainingSeconds: 1200
+    property int eyeBreakDuration: 20
+    property int eyeTimeSinceLastBreak: 0
+    property bool eyeIsOverdue: false
+    property bool eyeIsPaused: false
+
+    readonly property bool eyePillVisible: {
+        if (!root.cfgShowEyeTab) return false;
+        if (root.activeNotificationPill || root.activeBatteryPill) return false;
+        if (root.eyeState === "break") return true; // Break alert overrides lyrics for 20s
+        if (root.showPillLyrics) return false; // Lirik tidak boleh hilang tanpa alasan
+        if (root.timerPillVisible) return false; // General timer takes precedence
+        return (root.eyeState === "running" && root.eyeIsOverdue);
+    }
+
     readonly property int currentCompactWidth: {
         if (root.activeNotificationPill) {
             return Math.max(220, Math.min(360, Math.ceil(notifMetrics.advanceWidth) + 64));
         }
         if (root.activeBatteryPill) return 210;
+        if (root.eyePillVisible && root.eyeState === "break") return 220;
         if (root.activeTimerAlertPill) return 210;
         if (root.showPillLyrics) {
             // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer if active) + 24 (left 12 + right 12)
@@ -193,6 +213,7 @@ PlasmoidItem {
             return Math.max(160, Math.min(540, totalW));
         }
         if (root.timerPillVisible) return 200;
+        if (root.eyePillVisible) return 200;
         var miniVisW = (root.cfgShowVisualizer) ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 12) : 0;
         var musicIconExtraW = (root.cfgMiniMusicIconEnabled) ? Math.max(0, root.cfgMiniMusicIconSize - 12 + 6) : 0;
         return root.isPlaying ? root.cfgCompactWidth + miniVisW + musicIconExtraW : root.cfgCompactWidth;
@@ -1303,6 +1324,64 @@ PlasmoidItem {
         dbusTimerSetSound.call("SetSoundEnabled", [root.cfgTimerSoundEnabled]);
     }
 
+    // --- Eye Care D-Bus Integration ---
+    DBus.Properties {
+        id: dbusEyeProps
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.eyecare"
+        path: "/EyeCare"
+        iface: "org.kde.plasma.dynamicisland.eyecare"
+
+        onPropertiesChanged: (ifaceName, changedProps, invalidated) => {
+            if (changedProps["state"] !== undefined) root.eyeState = changedProps["state"];
+            if (changedProps["intervalMinutes"] !== undefined) root.eyeIntervalMinutes = changedProps["intervalMinutes"];
+            if (changedProps["remainingSeconds"] !== undefined) root.eyeRemainingSeconds = changedProps["remainingSeconds"];
+            if (changedProps["breakDuration"] !== undefined) root.eyeBreakDuration = changedProps["breakDuration"];
+            if (changedProps["timeSinceLastBreak"] !== undefined) root.eyeTimeSinceLastBreak = changedProps["timeSinceLastBreak"];
+            if (changedProps["isOverdue"] !== undefined) root.eyeIsOverdue = changedProps["isOverdue"];
+            if (changedProps["isPaused"] !== undefined) root.eyeIsPaused = changedProps["isPaused"];
+        }
+        onRefreshed: {
+            if (properties["state"] !== undefined) root.eyeState = properties["state"];
+            if (properties["intervalMinutes"] !== undefined) root.eyeIntervalMinutes = properties["intervalMinutes"];
+            if (properties["remainingSeconds"] !== undefined) root.eyeRemainingSeconds = properties["remainingSeconds"];
+            if (properties["breakDuration"] !== undefined) root.eyeBreakDuration = properties["breakDuration"];
+            if (properties["timeSinceLastBreak"] !== undefined) root.eyeTimeSinceLastBreak = properties["timeSinceLastBreak"];
+            if (properties["isOverdue"] !== undefined) root.eyeIsOverdue = properties["isOverdue"];
+            if (properties["isPaused"] !== undefined) root.eyeIsPaused = properties["isPaused"];
+        }
+        Component.onCompleted: updateAll()
+    }
+
+    DBus.SignalWatcher {
+        id: dbusEyeSignalWatcher
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.eyecare"
+        path: "/EyeCare"
+        iface: "org.kde.plasma.dynamicisland.eyecare"
+
+        function dbusEyeUpdated(state, remaining_seconds, time_since_last_break, is_overdue, is_paused) {
+            root.eyeState = state;
+            root.eyeRemainingSeconds = remaining_seconds;
+            root.eyeTimeSinceLastBreak = time_since_last_break;
+            root.eyeIsOverdue = is_overdue;
+            root.eyeIsPaused = is_paused;
+        }
+
+        function dbusBreakStarted(break_duration) {
+            root.eyeState = "break";
+            root.eyeBreakDuration = break_duration;
+            root.eyeRemainingSeconds = break_duration;
+        }
+
+        function dbusBreakFinished() {
+            root.eyeState = "running";
+            root.eyeRemainingSeconds = root.eyeIntervalMinutes * 60;
+            root.eyeTimeSinceLastBreak = 0;
+            root.eyeIsOverdue = false;
+        }
+    }
+
     // --- Global Notifications Monitor (WatchedNotificationsModel & Session History) ---
     property bool activeNotificationPill: false
     property string notifAppName: ""
@@ -1616,11 +1695,26 @@ PlasmoidItem {
             timerTotalDuration: root.timerTotalDuration
             timerTargetTimestamp: root.timerTargetTimestamp
 
+            eyePillVisible: root.eyePillVisible
+            eyeState: root.eyeState
+            eyeIntervalMinutes: root.eyeIntervalMinutes
+            eyeRemainingSeconds: root.eyeRemainingSeconds
+            eyeBreakDuration: root.eyeBreakDuration
+            eyeTimeSinceLastBreak: root.eyeTimeSinceLastBreak
+            eyeIsOverdue: root.eyeIsOverdue
+            eyeIsPaused: root.eyeIsPaused
+
             onRequestToggle: root.openNotch()
             onRequestOpenTimer: {
                 var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
                 var timerIdx = card.availableTabs.indexOf("timer");
                 if (timerIdx !== -1) root.openNotch(timerIdx);
+                else root.openNotch();
+            }
+            onRequestOpenEye: {
+                var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+                var eyeIdx = card.availableTabs.indexOf("eye");
+                if (eyeIdx !== -1) root.openNotch(eyeIdx);
                 else root.openNotch();
             }
         }
@@ -1710,6 +1804,7 @@ PlasmoidItem {
                 showCalendarTab: root.cfgShowCalendarTab
                 calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
                 showTimerTab: root.cfgShowTimerTab
+                showEyeTab: root.cfgShowEyeTab
 
                 cfgClockFontFamily: root.cfgClockFontFamily
                 cfgClockFontBold: root.cfgClockFontBold
@@ -1865,6 +1960,7 @@ PlasmoidItem {
         showCalendarTab: root.cfgShowCalendarTab
         calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
         showTimerTab: root.cfgShowTimerTab
+        showEyeTab: root.cfgShowEyeTab
 
         cfgClockFontFamily: root.cfgClockFontFamily
         cfgClockFontBold: root.cfgClockFontBold
