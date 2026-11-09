@@ -141,7 +141,15 @@ Item {
     property var visualizerLevels: []
     property bool visualizerServiceActive: false
 
+    property bool timerPillVisible: false
+    property bool activeTimerAlertPill: false
+    property string timerState: "idle"
+    property int timerRemainingSeconds: 0
+    property int timerTotalDuration: 0
+    property real timerTargetTimestamp: 0.0
+
     signal requestToggle()
+    signal requestOpenTimer()
 
     width: isFloatingStyle ? notchW : (notchW + (effectiveWingR * 2))
     height: notchH
@@ -280,11 +288,26 @@ Item {
             batteryPercent: compactNotchRoot.sysBatteryPct
         }
 
+        // State 2.5: Timer Pill (Active Countdown & Finished Alert)
+        TimerPill {
+            anchors.fill: parent
+            visible: opacity > 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && compactNotchRoot.timerPillVisible) ? 1 : 0
+            Behavior on opacity { NumberAnimation { duration: 160 } }
+            accentColor: compactNotchRoot.cfgAccentColor
+            clockFontFamily: compactNotchRoot.cfgClockFontFamily
+            timerState: compactNotchRoot.timerState
+            remainingSeconds: compactNotchRoot.timerRemainingSeconds
+            totalDuration: compactNotchRoot.timerTotalDuration
+            targetTimestamp: compactNotchRoot.timerTargetTimestamp
+            onRequestOpenTimer: compactNotchRoot.requestOpenTimer()
+        }
+
         // State 3: Dynamic Lyrics Pill
         LyricsPillView {
             anchors.fill: parent
             visible: opacity > 0
-            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && compactNotchRoot.showPillLyrics) ? 1 : 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.timerPillVisible && compactNotchRoot.showPillLyrics) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             currentLyricLine: compactNotchRoot.currentLyricLine
             trackTitle: compactNotchRoot.trackTitle
@@ -318,7 +341,7 @@ Item {
         StandbyView {
             anchors.fill: parent
             visible: opacity > 0
-            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.showPillLyrics) ? 1 : 0
+            opacity: (!compactNotchRoot.activeNotificationPill && !compactNotchRoot.activeBatteryPill && !compactNotchRoot.timerPillVisible && !compactNotchRoot.showPillLyrics) ? 1 : 0
             Behavior on opacity { NumberAnimation { duration: 160 } }
             isPlaying: compactNotchRoot.isPlaying
             currentTimeString: compactNotchRoot.currentTimeString

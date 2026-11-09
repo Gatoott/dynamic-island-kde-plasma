@@ -161,6 +161,12 @@
     <entry name="calendarFirstDayOfWeek" type="Int">
       <default>1</default>
     </entry>
+    <entry name="showTimerTab" type="Bool">
+      <default>true</default>
+    </entry>
+    <entry name="timerSoundEnabled" type="Bool">
+      <default>true</default>
+    </entry>
 
     <!-- Typography Customization -->
     <entry name="clockFontFamily" type="String">

@@ -64,6 +64,8 @@ PlasmoidItem {
     readonly property bool cfgShowNotificationTab: Plasmoid.configuration.showNotificationTab !== undefined ? Plasmoid.configuration.showNotificationTab : true
     readonly property bool cfgShowCalendarTab: Plasmoid.configuration.showCalendarTab !== undefined ? Plasmoid.configuration.showCalendarTab : true
     readonly property int cfgCalendarFirstDayOfWeek: Plasmoid.configuration.calendarFirstDayOfWeek !== undefined ? Plasmoid.configuration.calendarFirstDayOfWeek : 1
+    readonly property bool cfgShowTimerTab: Plasmoid.configuration.showTimerTab !== undefined ? Plasmoid.configuration.showTimerTab : true
+    readonly property bool cfgTimerSoundEnabled: Plasmoid.configuration.timerSoundEnabled !== undefined ? Plasmoid.configuration.timerSoundEnabled : true
     readonly property string cfgClockFontFamily: {
         var f = Plasmoid.configuration.clockFontFamily;
         return (f && f !== "Default (Inter/Roboto)") ? f : "";
@@ -159,11 +161,27 @@ PlasmoidItem {
         }
     }
 
+    // --- Timer State (D-Bus synchronized across multi-monitor) ---
+    property string timerState: "idle"
+    property int timerRemainingSeconds: 0
+    property int timerTotalDuration: 0
+    property real timerTargetTimestamp: 0.0
+    property bool activeTimerAlertPill: false
+
+    readonly property bool timerPillVisible: {
+        if (!root.cfgShowTimerTab) return false;
+        if (root.activeNotificationPill || root.activeBatteryPill) return false;
+        if (root.activeTimerAlertPill) return true;
+        if (root.showPillLyrics) return false; // "Lirik tidak boleh hilang tanpa alasan"
+        return (root.timerState === "running" || root.timerState === "paused");
+    }
+
     readonly property int currentCompactWidth: {
         if (root.activeNotificationPill) {
             return Math.max(220, Math.min(360, Math.ceil(notifMetrics.advanceWidth) + 64));
         }
         if (root.activeBatteryPill) return 210;
+        if (root.activeTimerAlertPill) return 210;
         if (root.showPillLyrics) {
             // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer if active) + 24 (left 12 + right 12)
             var iconW = 14;
@@ -174,6 +192,7 @@ PlasmoidItem {
             var totalW = iconW + gap + textW + visW + padding;
             return Math.max(160, Math.min(540, totalW));
         }
+        if (root.timerPillVisible) return 200;
         var miniVisW = (root.cfgShowVisualizer) ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 12) : 0;
         var musicIconExtraW = (root.cfgMiniMusicIconEnabled) ? Math.max(0, root.cfgMiniMusicIconSize - 12 + 6) : 0;
         return root.isPlaying ? root.cfgCompactWidth + miniVisW + musicIconExtraW : root.cfgCompactWidth;
@@ -1020,6 +1039,15 @@ PlasmoidItem {
         }
     }
 
+    Timer {
+        id: timerAlertDismissTimer
+        interval: 5000
+        repeat: false
+        onTriggered: {
+            root.activeTimerAlertPill = false;
+        }
+    }
+
     // 1. Plasma Native Battery Control Model
     Battery.BatteryControlModel {
         id: batteryModel
@@ -1214,6 +1242,65 @@ PlasmoidItem {
                 root.visualizerServiceActive = false;
             }
         }
+    }
+
+    // --- Timer D-Bus Integration ---
+    DBus.Properties {
+        id: dbusTimerProps
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.timer"
+        path: "/Timer"
+        iface: "org.kde.plasma.dynamicisland.timer"
+
+        onPropertiesChanged: (ifaceName, changedProps, invalidated) => {
+            if (changedProps["state"] !== undefined) root.timerState = changedProps["state"];
+            if (changedProps["remainingSeconds"] !== undefined) root.timerRemainingSeconds = changedProps["remainingSeconds"];
+            if (changedProps["totalDuration"] !== undefined) root.timerTotalDuration = changedProps["totalDuration"];
+            if (changedProps["targetTimestamp"] !== undefined) root.timerTargetTimestamp = changedProps["targetTimestamp"];
+        }
+        onRefreshed: {
+            if (properties["state"] !== undefined) root.timerState = properties["state"];
+            if (properties["remainingSeconds"] !== undefined) root.timerRemainingSeconds = properties["remainingSeconds"];
+            if (properties["totalDuration"] !== undefined) root.timerTotalDuration = properties["totalDuration"];
+            if (properties["targetTimestamp"] !== undefined) root.timerTargetTimestamp = properties["targetTimestamp"];
+        }
+        Component.onCompleted: updateAll()
+    }
+
+    DBus.SignalWatcher {
+        id: dbusTimerSignalWatcher
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.timer"
+        path: "/Timer"
+        iface: "org.kde.plasma.dynamicisland.timer"
+
+        function dbusTimerUpdated(state, remaining_seconds, total_duration, target_timestamp) {
+            root.timerState = state;
+            root.timerRemainingSeconds = remaining_seconds;
+            root.timerTotalDuration = total_duration;
+            root.timerTargetTimestamp = target_timestamp;
+        }
+
+        function dbusTimerFinished(total_duration) {
+            root.timerState = "finished";
+            root.timerRemainingSeconds = 0;
+            // Picu animasi alert singkat di notch
+            root.activeTimerAlertPill = true;
+            timerAlertDismissTimer.restart();
+        }
+    }
+
+    DBusCall {
+        id: dbusTimerSetSound
+        busType: DBus.BusType.Session
+        service: "org.kde.plasma.dynamicisland.timer"
+        path: "/Timer"
+        iface: "org.kde.plasma.dynamicisland.timer"
+        member: "SetSoundEnabled"
+    }
+
+    onCfgTimerSoundEnabledChanged: {
+        dbusTimerSetSound.call("SetSoundEnabled", [root.cfgTimerSoundEnabled]);
     }
 
     // --- Global Notifications Monitor (WatchedNotificationsModel & Session History) ---
@@ -1522,7 +1609,20 @@ PlasmoidItem {
             trackTitle: root.trackTitle
             trackArtist: root.trackArtist
 
+            timerPillVisible: root.timerPillVisible
+            activeTimerAlertPill: root.activeTimerAlertPill
+            timerState: root.timerState
+            timerRemainingSeconds: root.timerRemainingSeconds
+            timerTotalDuration: root.timerTotalDuration
+            timerTargetTimestamp: root.timerTargetTimestamp
+
             onRequestToggle: root.openNotch()
+            onRequestOpenTimer: {
+                var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+                var timerIdx = card.availableTabs.indexOf("timer");
+                if (timerIdx !== -1) root.openNotch(timerIdx);
+                else root.openNotch();
+            }
         }
     }
 
@@ -1609,6 +1709,7 @@ PlasmoidItem {
                 showNotificationTab: root.cfgShowNotificationTab
                 showCalendarTab: root.cfgShowCalendarTab
                 calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
+                showTimerTab: root.cfgShowTimerTab
 
                 cfgClockFontFamily: root.cfgClockFontFamily
                 cfgClockFontBold: root.cfgClockFontBold
@@ -1763,6 +1864,7 @@ PlasmoidItem {
         showNotificationTab: root.cfgShowNotificationTab
         showCalendarTab: root.cfgShowCalendarTab
         calendarFirstDayOfWeek: root.cfgCalendarFirstDayOfWeek
+        showTimerTab: root.cfgShowTimerTab
 
         cfgClockFontFamily: root.cfgClockFontFamily
         cfgClockFontBold: root.cfgClockFontBold

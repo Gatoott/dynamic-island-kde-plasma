@@ -107,6 +107,8 @@ KCM.SimpleKCM {
     property alias cfg_showClipboardTab: showClipboardTabCheck.checked
     property alias cfg_showCalendarTab: showCalendarTabCheck.checked
     property alias cfg_calendarFirstDayOfWeek: calendarFirstDayOfWeekCombo.currentIndex
+    property alias cfg_showTimerTab: showTimerTabCheck.checked
+    property alias cfg_timerSoundEnabled: timerSoundEnabledCheck.checked
 
     readonly property var systemFonts: ["Default (Inter/Roboto)"].concat(Qt.fontFamilies())
 
@@ -787,6 +789,20 @@ KCM.SimpleKCM {
             Kirigami.FormData.label: i18n("Awal Pekan Kalender:")
             model: [i18n("Minggu (Sunday)"), i18n("Senin (Monday - Default)")]
             currentIndex: 1
+        }
+
+        QQC2.CheckBox {
+            id: showTimerTabCheck
+            Kirigami.FormData.label: i18n("Tab Timer:")
+            text: i18n("Aktifkan Tab Timer & Countdown")
+            checked: true
+        }
+
+        QQC2.CheckBox {
+            id: timerSoundEnabledCheck
+            Kirigami.FormData.label: i18n("Suara Timer:")
+            text: i18n("Putar Suara Alarm Saat Timer Selesai")
+            checked: true
         }
     }
 }

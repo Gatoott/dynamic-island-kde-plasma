@@ -11,6 +11,7 @@ Uses cava's built-in sleep_timer to suspend CPU usage when audio is silent.
 import os
 import sys
 import time
+import json
 import shutil
 import signal
 import subprocess
@@ -25,6 +26,10 @@ IFACE = "org.kde.plasma.dynamicisland.visualizer"
 PATH = "/Visualizer"
 CONFIG_DIR = os.path.expanduser("~/.config/plasma-dynamic-island")
 CAVA_CONF = os.path.join(CONFIG_DIR, "cava.conf")
+
+TIMER_IFACE = "org.kde.plasma.dynamicisland.timer"
+TIMER_PATH = "/Timer"
+TIMER_STATE_FILE = os.path.join(CONFIG_DIR, "timer_state.json")
 
 def ensure_cava_config():
     os.makedirs(CONFIG_DIR, exist_ok=True)
@@ -158,6 +163,287 @@ class VisualizerService(dbus.service.Object):
         GLib.idle_add(_emit)
 
 
+class TimerService(dbus.service.Object):
+    def __init__(self, bus):
+        bus_name = dbus.service.BusName(TIMER_IFACE, bus)
+        super().__init__(bus_name, TIMER_PATH)
+        self.bus = bus
+        self._lock = threading.Lock()
+        self.state = "idle" # idle, running, paused, finished
+        self.total_duration = 0
+        self.remaining_seconds = 0
+        self.target_timestamp = 0.0
+        self.sound_enabled = True
+        self._timer_source_id = None
+        self._load_state()
+
+    def _load_state(self):
+        if not os.path.exists(TIMER_STATE_FILE):
+            return
+        try:
+            with open(TIMER_STATE_FILE, "r") as f:
+                data = json.load(f)
+            saved_state = data.get("state", "idle")
+            self.total_duration = int(data.get("total_duration", 0))
+            self.sound_enabled = bool(data.get("sound_enabled", True))
+            target_ts = float(data.get("target_timestamp", 0.0))
+            rem_sec = int(data.get("remaining_seconds", 0))
+
+            now = time.time()
+            if saved_state == "running" and target_ts > 0:
+                if target_ts > now:
+                    self.target_timestamp = target_ts
+                    self.remaining_seconds = max(0, int(round(target_ts - now)))
+                    self.state = "running"
+                    self._start_timer_loop()
+                else:
+                    self.target_timestamp = 0.0
+                    self.remaining_seconds = 0
+                    self.state = "finished"
+            elif saved_state == "paused":
+                self.state = "paused"
+                self.remaining_seconds = rem_sec
+                self.target_timestamp = 0.0
+            elif saved_state == "finished":
+                self.state = "finished"
+                self.remaining_seconds = 0
+            else:
+                self.state = "idle"
+                self.remaining_seconds = 0
+        except Exception as e:
+            print("[Timer] Gagal memuat state:", e, flush=True)
+
+    def _save_state(self):
+        try:
+            os.makedirs(CONFIG_DIR, exist_ok=True)
+            data = {
+                "state": self.state,
+                "total_duration": self.total_duration,
+                "remaining_seconds": self.remaining_seconds,
+                "target_timestamp": self.target_timestamp,
+                "sound_enabled": self.sound_enabled
+            }
+            tmp = TIMER_STATE_FILE + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(data, f)
+            os.replace(tmp, TIMER_STATE_FILE)
+        except Exception as e:
+            print("[Timer] Gagal menyimpan state:", e, flush=True)
+
+    def _start_timer_loop(self):
+        if self._timer_source_id is not None:
+            GLib.source_remove(self._timer_source_id)
+        self._timer_source_id = GLib.timeout_add(1000, self._on_tick)
+
+    def _stop_timer_loop(self):
+        if self._timer_source_id is not None:
+            GLib.source_remove(self._timer_source_id)
+            self._timer_source_id = None
+
+    def _on_tick(self):
+        with self._lock:
+            if self.state != "running":
+                self._timer_source_id = None
+                return False
+
+            now = time.time()
+            remaining = int(round(self.target_timestamp - now))
+            if remaining <= 0:
+                self.remaining_seconds = 0
+                self.state = "finished"
+                self._stop_timer_loop()
+                self._save_state()
+                self._emit_updated()
+                self._trigger_finished()
+                return False
+            else:
+                self.remaining_seconds = remaining
+                self._emit_updated()
+                return True
+
+    def _trigger_finished(self):
+        def _fire():
+            try:
+                self.TimerFinished(dbus.Int32(self.total_duration))
+            except Exception:
+                pass
+
+            # Mainkan suara alarm sistem jika diaktifkan di konfigurasi
+            if self.sound_enabled:
+                sound_file = "/usr/share/sounds/ocean/stereo/alarm-clock-elapsed.oga"
+                if not os.path.exists(sound_file):
+                    sound_file = "/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+                if shutil.which("pw-play") and os.path.exists(sound_file):
+                    try:
+                        subprocess.Popen(["pw-play", sound_file], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except Exception:
+                        pass
+                elif shutil.which("canberra-gtk-play"):
+                    try:
+                        subprocess.Popen(["canberra-gtk-play", "-i", "alarm-clock-elapsed"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except Exception:
+                        pass
+
+            # Kirim notifikasi desktop (Satu notifikasi tunggal untuk seluruh monitor)
+            if shutil.which("notify-send"):
+                try:
+                    mins = self.total_duration // 60
+                    secs = self.total_duration % 60
+                    dur_str = f"{mins} menit" if mins > 0 and secs == 0 else (f"{self.total_duration} detik" if mins == 0 else f"{mins}m {secs}s")
+                    subprocess.Popen([
+                        "notify-send",
+                        "-a", "Dynamic Island",
+                        "-i", "chronometer",
+                        "-u", "critical",
+                        "Timer Selesai!",
+                        f"Waktu {dur_str} telah habis."
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                except Exception:
+                    pass
+
+        GLib.idle_add(_fire)
+
+    def _emit_updated(self):
+        def _fire():
+            try:
+                self.TimerUpdated(
+                    dbus.String(self.state),
+                    dbus.Int32(self.remaining_seconds),
+                    dbus.Int32(self.total_duration),
+                    dbus.Double(self.target_timestamp)
+                )
+
+                changed = dbus.Dictionary({
+                    dbus.String("state"): dbus.String(self.state, variant_level=1),
+                    dbus.String("remainingSeconds"): dbus.Int32(self.remaining_seconds, variant_level=1),
+                    dbus.String("totalDuration"): dbus.Int32(self.total_duration, variant_level=1),
+                    dbus.String("targetTimestamp"): dbus.Double(self.target_timestamp, variant_level=1),
+                    dbus.String("soundEnabled"): dbus.Boolean(self.sound_enabled, variant_level=1)
+                }, signature="sv")
+                self.PropertiesChanged(TIMER_IFACE, changed, dbus.Array([], signature="s"))
+            except Exception:
+                pass
+        GLib.idle_add(_fire)
+
+    # --- D-Bus Methods ---
+    @dbus.service.method(TIMER_IFACE, in_signature="i", out_signature="b")
+    def Start(self, duration_seconds):
+        dur = int(duration_seconds)
+        if dur <= 0:
+            return False
+        with self._lock:
+            now = time.time()
+            self.total_duration = dur
+            self.remaining_seconds = dur
+            self.target_timestamp = now + dur
+            self.state = "running"
+            self._save_state()
+            self._start_timer_loop()
+        self._emit_updated()
+        print(f"[Timer] Dimulai: {dur} detik (target: {self.target_timestamp})", flush=True)
+        return True
+
+    @dbus.service.method(TIMER_IFACE, out_signature="b")
+    def Pause(self):
+        with self._lock:
+            if self.state == "running":
+                now = time.time()
+                self.remaining_seconds = max(1, int(round(self.target_timestamp - now)))
+                self.target_timestamp = 0.0
+                self.state = "paused"
+                self._stop_timer_loop()
+                self._save_state()
+        self._emit_updated()
+        print(f"[Timer] Dijeda: sisa {self.remaining_seconds} detik", flush=True)
+        return True
+
+    @dbus.service.method(TIMER_IFACE, out_signature="b")
+    def Resume(self):
+        with self._lock:
+            if self.state == "paused" and self.remaining_seconds > 0:
+                now = time.time()
+                self.target_timestamp = now + self.remaining_seconds
+                self.state = "running"
+                self._save_state()
+                self._start_timer_loop()
+        self._emit_updated()
+        print(f"[Timer] Dilanjutkan: sisa {self.remaining_seconds} detik", flush=True)
+        return True
+
+    @dbus.service.method(TIMER_IFACE, out_signature="b")
+    def Reset(self):
+        with self._lock:
+            self.state = "idle"
+            self.remaining_seconds = 0
+            self.total_duration = 0
+            self.target_timestamp = 0.0
+            self._stop_timer_loop()
+            self._save_state()
+        self._emit_updated()
+        print("[Timer] Direset ke idle", flush=True)
+        return True
+
+    @dbus.service.method(TIMER_IFACE, out_signature="b")
+    def DismissFinished(self):
+        with self._lock:
+            if self.state == "finished":
+                self.state = "idle"
+                self.remaining_seconds = 0
+                self.total_duration = 0
+                self.target_timestamp = 0.0
+                self._save_state()
+        self._emit_updated()
+        return True
+
+    @dbus.service.method(TIMER_IFACE, in_signature="b", out_signature="b")
+    def SetSoundEnabled(self, enabled):
+        with self._lock:
+            self.sound_enabled = bool(enabled)
+            self._save_state()
+        self._emit_updated()
+        return True
+
+    # --- Properties Interface ---
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="ss", out_signature="v")
+    def Get(self, interface, prop):
+        with self._lock:
+            if prop == "state":
+                return dbus.String(self.state)
+            elif prop == "remainingSeconds":
+                return dbus.Int32(self.remaining_seconds)
+            elif prop == "totalDuration":
+                return dbus.Int32(self.total_duration)
+            elif prop == "targetTimestamp":
+                return dbus.Double(self.target_timestamp)
+            elif prop == "soundEnabled":
+                return dbus.Boolean(self.sound_enabled)
+        return dbus.String("")
+
+    @dbus.service.method(dbus.PROPERTIES_IFACE, in_signature="s", out_signature="a{sv}")
+    def GetAll(self, interface):
+        with self._lock:
+            return dbus.Dictionary({
+                dbus.String("state"): dbus.String(self.state, variant_level=1),
+                dbus.String("remainingSeconds"): dbus.Int32(self.remaining_seconds, variant_level=1),
+                dbus.String("totalDuration"): dbus.Int32(self.total_duration, variant_level=1),
+                dbus.String("targetTimestamp"): dbus.Double(self.target_timestamp, variant_level=1),
+                dbus.String("soundEnabled"): dbus.Boolean(self.sound_enabled, variant_level=1)
+            }, signature="sv")
+
+    # --- Signals ---
+    @dbus.service.signal(TIMER_IFACE, signature="siid")
+    def TimerUpdated(self, state, remaining_seconds, total_duration, target_timestamp):
+        pass
+
+    @dbus.service.signal(TIMER_IFACE, signature="i")
+    def TimerFinished(self, total_duration):
+        pass
+
+    @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
+    def PropertiesChanged(self, interface_name, changed_properties, invalidated_properties):
+        pass
+
+
 class CavaRunner:
     def __init__(self, service):
         self.service = service
@@ -270,6 +556,7 @@ def main():
     DBusGMainLoop(set_as_default=True)
     bus = dbus.SessionBus()
     service = VisualizerService(bus)
+    timer_service = TimerService(bus)
     runner = CavaRunner(service)
 
     def on_set_playing(is_playing):
@@ -284,14 +571,16 @@ def main():
     loop = GLib.MainLoop()
 
     def handle_signal(sig, frame):
-        print(f"\n[Visualizer] Menghentikan service (signal {sig})...", flush=True)
+        print(f"\n[DynamicIsland] Menghentikan service (signal {sig})...", flush=True)
         runner.stop()
+        timer_service._stop_timer_loop()
         loop.quit()
 
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
     print(f"[Visualizer] Service aktif pada D-Bus: {IFACE} di {PATH}", flush=True)
+    print(f"[Timer] Service aktif pada D-Bus: {TIMER_IFACE} di {TIMER_PATH}", flush=True)
     try:
         loop.run()
     except KeyboardInterrupt:
