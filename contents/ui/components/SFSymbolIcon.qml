@@ -278,6 +278,179 @@ Canvas {
             ctx.beginPath();
             ctx.arc(w * 0.50, h * 0.50, w * 0.18, 0, Math.PI * 2);
             ctx.fill();
+        } else if (name === "music.note") {
+            ctx.fillStyle = iconCanvas.color;
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            // Note head (tilted oval)
+            ctx.save();
+            ctx.translate(w * 0.36, h * 0.72);
+            ctx.rotate(-20 * Math.PI / 180);
+            ctx.scale(1.3, 0.9);
+            ctx.beginPath();
+            ctx.arc(0, 0, w * 0.15, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Vertical stem & curved flag
+            ctx.beginPath();
+            ctx.moveTo(w * 0.52, h * 0.70);
+            ctx.lineTo(w * 0.52, h * 0.18);
+            ctx.bezierCurveTo(w * 0.74, h * 0.20, w * 0.84, h * 0.38, w * 0.82, h * 0.56);
+            ctx.stroke();
+        } else if (name === "timer") {
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            var cx = w * 0.50;
+            var cy = h * 0.56;
+            var r = w * 0.35;
+
+            // Watch body circle
+            ctx.beginPath();
+            ctx.arc(cx, cy, r, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Top crown / push button
+            ctx.beginPath();
+            ctx.moveTo(cx, cy - r);
+            ctx.lineTo(cx, h * 0.10);
+            ctx.moveTo(w * 0.38, h * 0.10);
+            ctx.lineTo(w * 0.62, h * 0.10);
+            ctx.stroke();
+
+            // Angled clicker at top right (45 deg)
+            ctx.beginPath();
+            ctx.moveTo(cx + r * 0.68, cy - r * 0.68);
+            ctx.lineTo(cx + r * 0.92, cy - r * 0.92);
+            ctx.stroke();
+
+            // Timer clock hand inside pointing to ~1:30
+            ctx.beginPath();
+            ctx.moveTo(cx, cy);
+            ctx.lineTo(cx + r * 0.45, cy - r * 0.45);
+            ctx.stroke();
+        } else if (name === "calendar") {
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            var calX = w * 0.15;
+            var calY = h * 0.22;
+            var calW = w * 0.70;
+            var calH = h * 0.66;
+            var calR = w * 0.12;
+
+            drawRoundRect(ctx, calX, calY, calW, calH, calR);
+            ctx.stroke();
+
+            // Top hooks
+            ctx.beginPath();
+            ctx.moveTo(w * 0.34, h * 0.12);
+            ctx.lineTo(w * 0.34, h * 0.26);
+            ctx.moveTo(w * 0.66, h * 0.12);
+            ctx.lineTo(w * 0.66, h * 0.26);
+            ctx.stroke();
+
+            // Horizontal header divider
+            ctx.beginPath();
+            ctx.moveTo(calX, h * 0.44);
+            ctx.lineTo(calX + calW, h * 0.44);
+            ctx.stroke();
+
+            // Mini date dots inside calendar
+            ctx.fillStyle = iconCanvas.color;
+            var dotR = w * 0.055;
+            var dY1 = h * 0.58;
+            var dY2 = h * 0.74;
+            var dX1 = w * 0.35;
+            var dX2 = w * 0.50;
+            var dX3 = w * 0.65;
+
+            ctx.beginPath();
+            ctx.arc(dX1, dY1, dotR, 0, Math.PI * 2);
+            ctx.arc(dX2, dY1, dotR, 0, Math.PI * 2);
+            ctx.arc(dX3, dY1, dotR, 0, Math.PI * 2);
+            ctx.arc(dX1, dY2, dotR, 0, Math.PI * 2);
+            ctx.arc(dX2, dY2, dotR, 0, Math.PI * 2);
+            ctx.fill();
+        } else if (name === "slider.horizontal.3") {
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            var leftX = w * 0.14;
+            var rightX = w * 0.86;
+            var knobH = h * 0.12;
+
+            // Track 1 & knob
+            var y1 = h * 0.26;
+            ctx.beginPath();
+            ctx.moveTo(leftX, y1);
+            ctx.lineTo(rightX, y1);
+            ctx.moveTo(w * 0.35, y1 - knobH);
+            ctx.lineTo(w * 0.35, y1 + knobH);
+            ctx.stroke();
+
+            // Track 2 & knob
+            var y2 = h * 0.50;
+            ctx.beginPath();
+            ctx.moveTo(leftX, y2);
+            ctx.lineTo(rightX, y2);
+            ctx.moveTo(w * 0.68, y2 - knobH);
+            ctx.lineTo(w * 0.68, y2 + knobH);
+            ctx.stroke();
+
+            // Track 3 & knob
+            var y3 = h * 0.74;
+            ctx.beginPath();
+            ctx.moveTo(leftX, y3);
+            ctx.lineTo(rightX, y3);
+            ctx.moveTo(w * 0.45, y3 - knobH);
+            ctx.lineTo(w * 0.45, y3 + knobH);
+            ctx.stroke();
+        } else if (name === "doc.on.clipboard") {
+            ctx.strokeStyle = iconCanvas.color;
+            ctx.lineWidth = iconCanvas.strokeWidth;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+
+            // Board outline
+            var bX = w * 0.18;
+            var bY = h * 0.20;
+            var bW = w * 0.64;
+            var bH = h * 0.70;
+            var bR = w * 0.10;
+            drawRoundRect(ctx, bX, bY, bW, bH, bR);
+            ctx.stroke();
+
+            // Top clip
+            var cX = w * 0.35;
+            var cY = h * 0.10;
+            var cW = w * 0.30;
+            var cH = h * 0.16;
+            var cR = w * 0.06;
+            drawRoundRect(ctx, cX, cY, cW, cH, cR);
+            ctx.fillStyle = iconCanvas.circleColor;
+            ctx.fill();
+            ctx.stroke();
+
+            // Document text lines
+            ctx.beginPath();
+            ctx.moveTo(w * 0.32, h * 0.44);
+            ctx.lineTo(w * 0.68, h * 0.44);
+            ctx.moveTo(w * 0.32, h * 0.58);
+            ctx.lineTo(w * 0.68, h * 0.58);
+            ctx.moveTo(w * 0.32, h * 0.72);
+            ctx.lineTo(w * 0.54, h * 0.72);
+            ctx.stroke();
         }
     }
 }

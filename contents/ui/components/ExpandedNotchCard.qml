@@ -297,7 +297,7 @@ Item {
     }
 
     // Tetapkan satu nilai tinggi & lebar tetap (Uniform Dimensions):
-    readonly property real standardCardHeight: 180
+    readonly property real standardCardHeight: 200
     readonly property real standardCardWidth: getTargetWidthForTab(currentExpandedTab, showLyrics)
     property alias expandedContentArea: expandedContent
 
@@ -315,6 +315,19 @@ Item {
 
     function getTargetHeightForTab(tabIndex, lyricsActive) {
         return standardCardHeight;
+    }
+
+    function getTabIconName(tabKey) {
+        switch (tabKey) {
+            case "media": return "music.note";
+            case "notification": return "bell.fill";
+            case "timer": return "timer";
+            case "eye": return "eye";
+            case "calendar": return "calendar";
+            case "control": return "slider.horizontal.3";
+            case "clipboard": return "doc.on.clipboard";
+            default: return "music.note";
+        }
     }
 
     // Ikat targetW dan targetH secara langsung dan reaktif (Kunci targetH agar selalu sama):
@@ -932,39 +945,80 @@ Item {
                 }
             }
 
-            // Bottom Navigation Bar with Dots
+            // Bottom Navigation Bar with Tab Icons
             Item {
-                id: navDotsBar
+                id: navIconsBar
                 anchors.bottom: parent.bottom
                 anchors.bottomMargin: 8
                 anchors.horizontalCenter: parent.horizontalCenter
                 width: parent.width
-                height: 20
+                height: 28
                 z: 10
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !(unifiedNotchRoot.activeTabKey === "media" && unifiedNotchRoot.showLyrics)
 
-                // Pagination Dots
-                Row {
-                    id: paginationDotsRow
+                // Dock-style subtle pill container
+                Rectangle {
                     anchors.centerIn: parent
-                    visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !unifiedNotchRoot.showLyrics
-                    spacing: 7
+                    width: iconRow.width + 10
+                    height: 28
+                    radius: 14
+                    color: Qt.rgba(0, 0, 0, 0.35)
+                    border.width: 1
+                    border.color: Qt.rgba(1, 1, 1, 0.08)
 
-                    Repeater {
-                        model: unifiedNotchRoot.availableTabs.length
-                        Rectangle {
-                            required property int index
-                            readonly property bool isCurrent: (unifiedNotchRoot.currentExpandedTab % unifiedNotchRoot.availableTabs.length) === index
-                            width: isCurrent ? 16 : 6
-                            height: 6
-                            radius: 3
-                            color: isCurrent ? unifiedNotchRoot.cfgAccentColor : Qt.rgba(1, 1, 1, 0.25)
-                            Behavior on width { NumberAnimation { duration: 200 } }
-                            Behavior on color { ColorAnimation { duration: 200 } }
+                    Row {
+                        id: iconRow
+                        anchors.centerIn: parent
+                        spacing: 4
 
-                            MouseArea {
-                                anchors.fill: parent
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: unifiedNotchRoot.requestSwitchTab(parent.index)
+                        Repeater {
+                            model: unifiedNotchRoot.availableTabs
+
+                            Rectangle {
+                                id: iconPill
+                                required property string modelData
+                                required property int index
+                                readonly property bool isCurrent: (unifiedNotchRoot.currentExpandedTab % unifiedNotchRoot.availableTabs.length) === index
+
+                                width: isCurrent ? 32 : 24
+                                height: 22
+                                radius: 11
+
+                                color: isCurrent 
+                                       ? Qt.rgba(unifiedNotchRoot.cfgAccentColor.r, unifiedNotchRoot.cfgAccentColor.g, unifiedNotchRoot.cfgAccentColor.b, 0.22)
+                                       : (iconMa.containsMouse ? Qt.rgba(1, 1, 1, 0.12) : "transparent")
+
+                                border.width: isCurrent ? 1 : 0
+                                border.color: isCurrent 
+                                              ? Qt.rgba(unifiedNotchRoot.cfgAccentColor.r, unifiedNotchRoot.cfgAccentColor.g, unifiedNotchRoot.cfgAccentColor.b, 0.45) 
+                                              : "transparent"
+
+                                scale: isCurrent ? 1.08 : (iconMa.containsMouse ? 1.04 : 1.0)
+
+                                Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
+                                Behavior on scale { NumberAnimation { duration: 200; easing.type: Easing.OutQuad } }
+                                Behavior on color { ColorAnimation { duration: 200 } }
+                                Behavior on border.color { ColorAnimation { duration: 200 } }
+
+                                SFSymbolIcon {
+                                    anchors.centerIn: parent
+                                    width: 13
+                                    height: 13
+                                    strokeWidth: 1.6
+                                    name: unifiedNotchRoot.getTabIconName(iconPill.modelData)
+                                    color: iconPill.isCurrent 
+                                           ? unifiedNotchRoot.cfgAccentColor 
+                                           : (iconMa.containsMouse ? "#ffffff" : Qt.rgba(1, 1, 1, 0.45))
+                                    Behavior on color { ColorAnimation { duration: 200 } }
+                                }
+
+                                MouseArea {
+                                    id: iconMa
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: unifiedNotchRoot.requestSwitchTab(iconPill.index)
+                                }
                             }
                         }
                     }
@@ -981,7 +1035,7 @@ Item {
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !(unifiedNotchRoot.activeTabKey === "media" && unifiedNotchRoot.showLyrics)
                 color: leftNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
@@ -1019,7 +1073,7 @@ Item {
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !(unifiedNotchRoot.activeTabKey === "media" && unifiedNotchRoot.showLyrics)
                 color: rightNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)

@@ -11,7 +11,7 @@ Item {
     id: root
 
     implicitWidth: 500
-    implicitHeight: 180
+    implicitHeight: 200
 
     property color accentColor: "#3daee9"
     property string clockFontFamily: ""
@@ -160,7 +160,7 @@ Item {
         anchors.leftMargin: 44
         anchors.rightMargin: 44
         anchors.topMargin: 10
-        anchors.bottomMargin: 24
+        anchors.bottomMargin: 38
 
         // =============================================================
         // VIEW A: NORMAL SESSION VIEW (Idle / Running)

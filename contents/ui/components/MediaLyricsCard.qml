@@ -354,7 +354,7 @@ Item {
         id: standardMediaView
         anchors.fill: parent
         anchors.topMargin: 12
-        anchors.bottomMargin: 24
+        anchors.bottomMargin: 38
         anchors.leftMargin: 46
         anchors.rightMargin: 46
         visible: !mediaCardRoot.showLyrics

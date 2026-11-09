@@ -10,7 +10,7 @@ Item {
     id: root
 
     implicitWidth: 500
-    implicitHeight: 180
+    implicitHeight: 200
 
     property color accentColor: "#3daee9"
     property int firstDayOfWeek: 1 // 1 = Senin (Monday), 0 = Minggu (Sunday)
@@ -253,7 +253,7 @@ Item {
         anchors.leftMargin: 44
         anchors.rightMargin: 44
         anchors.topMargin: 10
-        anchors.bottomMargin: 24
+        anchors.bottomMargin: 38
 
         // 1. Header Bar: Month Year title & Actions
         Item {

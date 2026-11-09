@@ -295,7 +295,7 @@ Item {
         id: controlCenterFlickable
         anchors.fill: parent
         anchors.topMargin: 12
-        anchors.bottomMargin: 16
+        anchors.bottomMargin: 38
         anchors.leftMargin: 40 // Ruang aman dari tombol panah navigasi kiri
         anchors.rightMargin: 40 // Ruang aman dari tombol panah navigasi kanan
         clip: true

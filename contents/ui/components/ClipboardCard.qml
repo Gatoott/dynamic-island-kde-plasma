@@ -98,7 +98,7 @@ Item {
         anchors.leftMargin: 44
         anchors.rightMargin: 44
         anchors.topMargin: 14
-        anchors.bottomMargin: 14
+        anchors.bottomMargin: 38
         spacing: 10
 
         // --- Header ---

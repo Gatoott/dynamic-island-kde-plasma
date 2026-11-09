@@ -117,7 +117,7 @@ Item {
         anchors.right: parent.right
         anchors.rightMargin: 46
         anchors.bottom: parent.bottom
-        anchors.bottomMargin: 26
+        anchors.bottomMargin: 38
         clip: true
         spacing: 6
         model: root.notificationItems
