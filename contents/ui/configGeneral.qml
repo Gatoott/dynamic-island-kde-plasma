@@ -420,7 +420,7 @@ KCM.SimpleKCM {
                 onToggled: if (checked) {
                     notchStyleSpin.value = 1;
                     shapeModeHiddenField.text = "pill";
-                    if (verticalOffsetSpin.value === 0) {
+                    if (verticalOffsetSpin.value <= 0) {
                         verticalOffsetSpin.value = 12;
                     }
                 }

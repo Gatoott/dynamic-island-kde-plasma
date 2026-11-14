@@ -11,12 +11,6 @@ Item {
     id: unifiedNotchRoot
     clip: true
 
-    anchors.top: parent.top
-    anchors.horizontalCenter: parent.horizontalCenter
-    anchors.topMargin: unifiedNotchRoot.isFloatingStyle 
-        ? ((typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchYOffset) ? plasmoid.configuration.notchYOffset : 8) 
-        : 0
-
     // State
     property bool isExpanded: false
     property int currentExpandedTab: 0
@@ -24,15 +18,7 @@ Item {
     property string currentTimeString: "00:00"
     property int notchStyle: 0
     property string islandShapeMode: "notch"
-    readonly property bool isFloatingStyle: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.notchStyle !== undefined) {
-            return plasmoid.configuration.notchStyle === 1;
-        }
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.notchStyle !== undefined) {
-            return Plasmoid.configuration.notchStyle === 1;
-        }
-        return notchStyle === 1;
-    }
+    readonly property bool isFloatingStyle: notchStyle === 1
 
     // Tab Modular Visibility
     property bool showControlTab: true
@@ -267,7 +253,7 @@ Item {
 
     readonly property real wingRadius: cfgNotchWingRadius
     readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
-    property real cornerRadius: (isExpanded && !isClosing) ? 22 : cfgNotchBottomRadius
+    property real cornerRadius: (isExpanded && !isClosing) ? 22 : (isFloatingStyle ? (compactHeight / 2) : cfgNotchBottomRadius)
     Behavior on cornerRadius {
         enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
         NumberAnimation {
@@ -370,7 +356,7 @@ Item {
         NumberAnimation {
             target: unifiedNotchRoot
             property: "cornerRadius"
-            to: unifiedNotchRoot.cfgNotchBottomRadius
+            to: isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius
             duration: 220
             easing.type: Easing.InOutCubic
         }
@@ -410,7 +396,7 @@ Item {
                 NumberAnimation {
                     target: unifiedNotchRoot
                     property: "cornerRadius"
-                    from: unifiedNotchRoot.cfgNotchBottomRadius
+                    from: isFloatingStyle ? (unifiedNotchRoot.animStartH / 2) : unifiedNotchRoot.cfgNotchBottomRadius
                     to: 22
                     duration: 280
                     easing.type: Easing.OutCubic
@@ -439,7 +425,7 @@ Item {
                 return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
             });
             unifiedNotchRoot.cornerRadius = Qt.binding(function() {
-                return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : unifiedNotchRoot.cfgNotchBottomRadius;
+                return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : (unifiedNotchRoot.isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius);
             });
             expandedContent.opacity = 1.0;
         }
@@ -471,7 +457,7 @@ Item {
 
         targetW = startW;
         targetH = startH;
-        cornerRadius = cfgNotchBottomRadius;
+        cornerRadius = isFloatingStyle ? (startH / 2) : cfgNotchBottomRadius;
         expandedContent.opacity = 0.0;
 
         openSequenceAnimation.restart();
@@ -485,7 +471,7 @@ Item {
             return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
         });
         cornerRadius = Qt.binding(function() {
-            return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : unifiedNotchRoot.cfgNotchBottomRadius;
+            return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : (unifiedNotchRoot.isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius);
         });
         expandedContent.opacity = unifiedNotchRoot.isExpanded ? 1.0 : 0.0;
         bodyOpacity = 1.0;
@@ -514,7 +500,7 @@ Item {
         visible: unifiedNotchRoot.isFloatingStyle
         anchors.fill: parent
         opacity: unifiedNotchRoot.bodyOpacity
-        radius: (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? unifiedNotchRoot.cornerRadius : (height / 2)
+        radius: (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isClosing) ? unifiedNotchRoot.cornerRadius : (height / 2)
         Behavior on radius {
             enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
             NumberAnimation { duration: 200 }

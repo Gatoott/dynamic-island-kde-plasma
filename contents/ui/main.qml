@@ -1817,7 +1817,7 @@ PlasmoidItem {
                 visible: root.dialogSurfaceOpen
                 enabled: root.dialogSurfaceOpen && root.isExpanded
                 anchors.top: parent.top
-                anchors.topMargin: root.isFloatingStyle ? root.effectiveVerticalOffset : 0
+                anchors.topMargin: root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset)
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.horizontalCenterOffset: root.cfgHorizontalOffset
                 isOverlayDialog: true
@@ -1973,7 +1973,7 @@ PlasmoidItem {
         id: desktopLivingNotch
         visible: !root.inPanel
         anchors.top: parent.top
-        anchors.topMargin: root.effectiveVerticalOffset
+        anchors.topMargin: root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
