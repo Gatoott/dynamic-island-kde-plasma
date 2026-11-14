@@ -1536,6 +1536,85 @@ PlasmoidItem {
         }
     }
 
+    // Jarak atas nyata compact pill terhadap tepi atas layar (px)
+    property int measuredPillTop: 0
+
+    function updateMeasuredPillTop() {
+        if (!root.inPanel) {
+            measuredPillTop = root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset);
+            return measuredPillTop;
+        }
+
+        var win = root.Window.window;
+        var scr = root.getHostScreen();
+        var virtualY = (scr && scr.virtualY !== undefined) ? scr.virtualY : 0;
+        var winY = (win && win.y !== undefined && win.y > 0) ? (win.y - virtualY) : 0;
+
+        var pillY = -9999;
+        if (panelCompactNotch) {
+            try {
+                // Sumber 1: mapToItem(null, 0, 0) mengukur koordinat relatif terhadap root panel window
+                var pItem = panelCompactNotch.mapToItem(null, 0, 0);
+                if (pItem && pItem.y !== undefined && !isNaN(pItem.y)) {
+                    pillY = winY + pItem.y;
+                }
+            } catch (e) {}
+
+            // Sumber 2: mapToGlobal jika didukung oleh platform QML/Wayland
+            if (typeof panelCompactNotch.mapToGlobal === "function") {
+                try {
+                    var gPt = panelCompactNotch.mapToGlobal(0, 0);
+                    if (gPt && gPt.y !== undefined && !isNaN(gPt.y)) {
+                        var gTop = gPt.y - virtualY;
+                        if (pillY === -9999 || Math.abs(pillY - gTop) <= 2) {
+                            pillY = gTop;
+                        }
+                    }
+                } catch (e2) {}
+            }
+        }
+
+        // Fallback jika pengukuran runtime tidak valid atau belum siap
+        if (pillY === -9999 || isNaN(pillY) || pillY < -200 || pillY > 500) {
+            pillY = root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset);
+        }
+
+        // Validasi batas agar kartu tidak keluar layar
+        if (root.isFloatingStyle) {
+            measuredPillTop = Math.max(0, pillY);
+        } else {
+            measuredPillTop = Math.min(0, pillY);
+        }
+
+        console.warn("[NOTCH_OFFSET] Mode: " + (root.isFloatingStyle ? "floating" : "docked")
+            + " | measuredPillTop: " + measuredPillTop
+            + " | raw pillY: " + pillY
+            + " | cfgOffset: " + root.effectiveVerticalOffset
+            + " | winY: " + winY
+            + " | scr: " + (scr ? scr.name : "null"));
+
+        return measuredPillTop;
+    }
+
+    readonly property int effectiveCardTopMargin: root.isFloatingStyle 
+        ? root.measuredPillTop 
+        : Math.min(0, root.effectiveVerticalOffset)
+
+    onEffectiveVerticalOffsetChanged: root.updateMeasuredPillTop()
+    onIsFloatingStyleChanged: root.updateMeasuredPillTop()
+
+    Component.onCompleted: {
+        root.updateMeasuredPillTop();
+    }
+
+    Timer {
+        id: pillMeasureTimer
+        interval: 500
+        repeat: false
+        running: true
+        onTriggered: root.updateMeasuredPillTop()
+    }
+
     function getHostScreen() {
         var screenList = (typeof Application !== "undefined" && Application.screens) ? Application.screens : (Qt.application ? Qt.application.screens : []);
         if (!screenList || screenList.length === 0) return null;
@@ -1580,6 +1659,9 @@ PlasmoidItem {
         }
 
         if (root.inPanel) {
+            // Perbarui posisi nyata pil kompak saat ini sebelum membuka overlay
+            root.updateMeasuredPillTop();
+
             var panelWin = root.Window.window;
             var hostScrn = root.getHostScreen();
             if (hostScrn && expandedDialog.screen !== hostScrn) {
@@ -1664,6 +1746,8 @@ PlasmoidItem {
         anchors.topMargin: root.effectiveVerticalOffset
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
+
+        onYChanged: root.updateMeasuredPillTop()
 
         opacity: root.compactVisible ? 1.0 : 0.0
         enabled: root.compactVisible && !root.isExpanded && !(expandedCardPanel && expandedCardPanel.isClosing) && !(expandedCardPanel && expandedCardPanel.isOpening)
@@ -1767,7 +1851,7 @@ PlasmoidItem {
         id: expandedDialog
         screen: root.dialogSurfaceOpen ? root.getHostScreen() : null
         width: 720
-        height: 520
+        height: Math.max(520, root.cfgExpandedHeight + root.effectiveCardTopMargin + 100)
         color: "transparent"
         flags: Qt.FramelessWindowHint
         visible: root.dialogSurfaceOpen
@@ -1798,8 +1882,8 @@ PlasmoidItem {
             id: fixedCanvas
             clip: false
             anchors.fill: parent
-            width: 720
-            height: 520
+            width: parent.width
+            height: parent.height
 
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
             MouseArea {
@@ -1817,7 +1901,7 @@ PlasmoidItem {
                 visible: root.dialogSurfaceOpen
                 enabled: root.dialogSurfaceOpen && root.isExpanded
                 anchors.top: parent.top
-                anchors.topMargin: root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset)
+                anchors.topMargin: root.effectiveCardTopMargin
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.horizontalCenterOffset: root.cfgHorizontalOffset
                 isOverlayDialog: true
@@ -1976,6 +2060,8 @@ PlasmoidItem {
         anchors.topMargin: root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset)
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
+
+        onYChanged: root.updateMeasuredPillTop()
 
         compactWidth: root.currentCompactWidth
         compactHeight: root.cfgCompactHeight
