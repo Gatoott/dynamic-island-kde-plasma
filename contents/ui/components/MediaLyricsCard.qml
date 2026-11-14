@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls as QQC2
 import QtQuick.Layouts
 import QtQuick.Shapes
+import QtQuick.Effects
 import org.kde.kirigami as Kirigami
 import org.kde.plasma.private.volume as PlasmaAudio
 import "."
@@ -530,107 +531,18 @@ Item {
                 Layout.preferredHeight: 38
 
                 // Volume Button with Hover Slider on Left side
-                Item {
-                    id: volHoverContainer
+                VolumeHoverControl {
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
-                    implicitWidth: volHoverMa.containsMouse || volSliderMa.pressed || (typeof speakerIconMa !== "undefined" && speakerIconMa.containsMouse) ? 104 : 32
-                    implicitHeight: 32
-
-                    Behavior on implicitWidth {
-                        NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
-                    }
-
-                    Rectangle {
-                        anchors.fill: parent
-                        radius: 16
-                        color: volHoverMa.containsMouse ? Qt.rgba(1, 1, 1, 0.16) : Qt.rgba(1, 1, 1, 0.08)
-                        border.width: 1
-                        border.color: Qt.rgba(1, 1, 1, 0.10)
-
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 8
-                            spacing: 6
-
-                            Item {
-                                id: volSliderRow
-                                Layout.fillWidth: true
-                                Layout.fillHeight: true
-                                visible: volHoverContainer.implicitWidth > 60
-
-                                Rectangle {
-                                    anchors.left: parent.left
-                                    anchors.right: parent.right
-                                    anchors.verticalCenter: parent.verticalCenter
-                                    height: 3
-                                    radius: 1.5
-                                    color: Qt.rgba(1, 1, 1, 0.25)
-
-                                    Rectangle {
-                                        anchors.left: parent.left
-                                        anchors.top: parent.top
-                                        anchors.bottom: parent.bottom
-                                        width: Math.max(3, parent.width * (mediaCardRoot.currentVolumePercent / 100))
-                                        radius: 1.5
-                                        color: mediaCardRoot.isMuted ? Qt.rgba(1, 1, 1, 0.45) : "#ffffff"
-                                    }
-                                }
-
-                                MouseArea {
-                                    id: volSliderMa
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    preventStealing: true
-
-                                    function updateMiniVol(mouse) {
-                                        const pct = Math.max(0, Math.min(100, Math.round((mouse.x / width) * 100)));
-                                        mediaCardRoot.setVolumePercent(pct);
-                                    }
-
-                                    onPressed: (mouse) => updateMiniVol(mouse)
-                                    onPositionChanged: (mouse) => {
-                                        if (pressed) updateMiniVol(mouse);
-                                    }
-                                    onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
-                                }
-                            }
-
-                            Item {
-                                Layout.preferredWidth: 16
-                                Layout.preferredHeight: 16
-                                Layout.alignment: Qt.AlignVCenter
-
-                                SFSymbolIcon {
-                                    anchors.centerIn: parent
-                                    width: 14
-                                    height: 14
-                                    name: (mediaCardRoot.isMuted || mediaCardRoot.currentVolumePercent === 0)
-                                        ? "speaker.slash.fill"
-                                        : (mediaCardRoot.currentVolumePercent < 50 ? "speaker.wave.1.fill" : "speaker.wave.2.fill")
-                                    color: mediaCardRoot.isMuted ? Qt.rgba(1, 1, 1, 0.5) : "#ffffff"
-                                }
-
-                                MouseArea {
-                                    id: speakerIconMa
-                                    anchors.fill: parent
-                                    hoverEnabled: true
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: mediaCardRoot.toggleMute()
-                                    onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: volHoverMa
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.NoButton
-                        onWheel: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
-                    }
+                    controlHeight: 32
+                    collapsedWidth: 32
+                    expandedWidth: 104
+                    iconSize: 14
+                    currentVolumePercent: mediaCardRoot.currentVolumePercent
+                    isMuted: mediaCardRoot.isMuted
+                    onRequestSetVolume: (pct) => mediaCardRoot.setVolumePercent(pct)
+                    onRequestToggleMute: () => mediaCardRoot.toggleMute()
+                    onRequestAdjustVolume: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
                 }
 
                 // Centered Transport Controls (Prev, Play/Pause White Pill, Next)
@@ -934,14 +846,18 @@ Item {
                     }
                 }
 
-                // Baris 3: Tombol kontrol ringkas berjejer di tengah (<<, Play/Pause, >>)
+                // Baris 3: Tombol kontrol ringkas (<<, Play/Pause, >>) + Volume
                 Item {
+                    id: miniControlsContainer
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 30
+                    Layout.preferredHeight: 32
 
                     RowLayout {
-                        anchors.centerIn: parent
-                        spacing: 22
+                        id: miniTransportRow
+                        anchors.verticalCenter: parent.verticalCenter
+                        anchors.left: parent.left
+                        anchors.leftMargin: 8
+                        spacing: 14
 
                         Rectangle {
                             width: 28
@@ -1017,6 +933,22 @@ Item {
                             }
                         }
                     }
+
+                    // Volume Hover Control di mode lirik
+                    VolumeHoverControl {
+                        anchors.right: parent.right
+                        anchors.rightMargin: 4
+                        anchors.verticalCenter: parent.verticalCenter
+                        controlHeight: 28
+                        collapsedWidth: 28
+                        expandedWidth: 84
+                        iconSize: 13
+                        currentVolumePercent: mediaCardRoot.currentVolumePercent
+                        isMuted: mediaCardRoot.isMuted
+                        onRequestSetVolume: (pct) => mediaCardRoot.setVolumePercent(pct)
+                        onRequestToggleMute: () => mediaCardRoot.toggleMute()
+                        onRequestAdjustVolume: (wheel) => mediaCardRoot.adjustVolumeWheel(wheel)
+                    }
                 }
             }
         }
@@ -1085,27 +1017,63 @@ Item {
                 }
 
                 delegate: Item {
+                    id: lyricDelegate
                     width: ListView.view.width
                     height: lyricText.implicitHeight + 8
 
-                    readonly property bool isCurrent: index === mediaCardRoot.currentLyricIndex
+                    readonly property int lineDiff: mediaCardRoot.currentLyricIndex >= 0 ? (index - mediaCardRoot.currentLyricIndex) : 0
+                    readonly property bool isCurrent: lineDiff === 0
+                    readonly property bool isPast: lineDiff < 0
+
+                    // Blur bertingkat Apple Music: baris aktif & lampau tajam,
+                    // baris mendatang di bawahnya makin jauh makin blur
+                    readonly property real rawBlur: {
+                        if (isCurrent || isPast) return 0.0;
+                        if (lineDiff === 1) return 0.20;
+                        if (lineDiff === 2) return 0.42;
+                        if (lineDiff === 3) return 0.65;
+                        return 0.85;
+                    }
+                    property real animatedBlur: rawBlur
+                    Behavior on animatedBlur {
+                        NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
+                    }
+
+                    // Warna redup bertingkat: baris aktif #ffffff, baris lampau 0.35,
+                    // baris mendatang makin jauh makin redup
+                    readonly property color targetColor: {
+                        if (isCurrent) return "#ffffff";
+                        if (isPast) return Qt.rgba(1, 1, 1, 0.35);
+                        if (lineDiff === 1) return Qt.rgba(1, 1, 1, 0.65);
+                        if (lineDiff === 2) return Qt.rgba(1, 1, 1, 0.45);
+                        if (lineDiff === 3) return Qt.rgba(1, 1, 1, 0.28);
+                        return Qt.rgba(1, 1, 1, 0.15);
+                    }
 
                     Text {
                         id: lyricText
                         width: parent.width
                         text: (modelData && modelData.text !== undefined) ? modelData.text : (modelData || "")
                         wrapMode: Text.WordWrap
-                        font.pixelSize: isCurrent ? 15 : 13
-                        font.bold: isCurrent
+                        font.pixelSize: lyricDelegate.isCurrent ? 15 : 13
+                        font.bold: lyricDelegate.isCurrent
                         font.family: mediaCardRoot.lyricsFontFamily !== "" ? mediaCardRoot.lyricsFontFamily : "Inter, Roboto, sans-serif"
-                        color: isCurrent ? "#ffffff" : Qt.rgba(1, 1, 1, 0.35)
+                        color: lyricDelegate.targetColor
                         horizontalAlignment: Text.AlignLeft
-                        scale: isCurrent ? 1.02 : 1.0
+                        scale: lyricDelegate.isCurrent ? 1.02 : 1.0
                         transformOrigin: Item.Left
 
-                        Behavior on color { ColorAnimation { duration: 150 } }
-                        Behavior on font.pixelSize { NumberAnimation { duration: 150 } }
-                        Behavior on scale { NumberAnimation { duration: 150 } }
+                        // GPU Shader blur hanya aktif saat baris memiliki blur (> 0.01)
+                        layer.enabled: lyricDelegate.animatedBlur > 0.01
+                        layer.effect: MultiEffect {
+                            blurEnabled: true
+                            blur: lyricDelegate.animatedBlur
+                            blurMax: 16
+                        }
+
+                        Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutQuad } }
+                        Behavior on font.pixelSize { NumberAnimation { duration: 180 } }
+                        Behavior on scale { NumberAnimation { duration: 180 } }
                     }
 
                     MouseArea {
