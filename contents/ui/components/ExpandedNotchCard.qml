@@ -253,7 +253,45 @@ Item {
 
     readonly property real wingRadius: cfgNotchWingRadius
     readonly property real effectiveWingRadius: isFloatingStyle ? 0 : wingRadius
-    property real cornerRadius: (isExpanded && !isClosing) ? 22 : (isFloatingStyle ? (compactHeight / 2) : cfgNotchBottomRadius)
+
+    // Driver progres penutupan tunggal (0.0..1.0) untuk sinkronisasi sempurna bentuk & radius
+    property real collapseProgress: 0.0
+    property real animStartR: 22
+
+    function computeTargetW() {
+        if (isClosing) {
+            return animStartW + (compactWidth - animStartW) * collapseProgress;
+        }
+        return isExpanded ? getTargetWidthForTab(currentExpandedTab, showLyrics) : compactWidth;
+    }
+
+    function computeTargetH() {
+        if (isClosing) {
+            return animStartH + (compactHeight - animStartH) * collapseProgress;
+        }
+        return isExpanded ? standardCardHeight : compactHeight;
+    }
+
+    function computeCornerRadius() {
+        if (isClosing) {
+            var p = collapseProgress;
+            var startR = animStartR > 0 ? animStartR : 22;
+            var endR = isFloatingStyle ? (compactHeight / 2) : cfgNotchBottomRadius;
+            var rawR = startR + (endR - startR) * p;
+            var maxR = Math.min(targetH / 2, targetW / 2);
+            return Math.max(0.1, Math.min(rawR, maxR));
+        }
+        if (isExpanded) return 22;
+        return isFloatingStyle ? (compactHeight / 2) : cfgNotchBottomRadius;
+    }
+
+    function resetGeometryBindings() {
+        targetW = Qt.binding(function() { return computeTargetW(); });
+        targetH = Qt.binding(function() { return computeTargetH(); });
+        cornerRadius = Qt.binding(function() { return computeCornerRadius(); });
+    }
+
+    property real cornerRadius: computeCornerRadius()
     Behavior on cornerRadius {
         enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
         NumberAnimation {
@@ -297,8 +335,8 @@ Item {
     }
 
     // Ikat targetW dan targetH secara langsung dan reaktif (Kunci targetH agar selalu sama):
-    property real targetW: isExpanded ? getTargetWidthForTab(currentExpandedTab, showLyrics) : compactWidth
-    property real targetH: isExpanded ? standardCardHeight : compactHeight
+    property real targetW: computeTargetW()
+    property real targetH: computeTargetH()
 
     width: isFloatingStyle ? targetW : (targetW + (effectiveWingRadius * 2))
     height: targetH
@@ -334,40 +372,29 @@ Item {
     ParallelAnimation {
         id: closeSequenceAnimation
 
-        // 1. Fade out konten secara cepat (70ms) agar bersih
+        // 1. Fade out konten expanded secara cepat di awal (120ms)
         NumberAnimation {
             target: expandedContent
             property: "opacity"
+            from: 1.0
             to: 0.0
-            duration: 70
+            duration: 120
             easing.type: Easing.OutQuad
         }
 
-        // 2. Susutkan bodi kartu ke ukuran standby pill (220ms)
+        // 2. Driver geometri penutupan bentuk bodi (300ms)
         NumberAnimation {
             target: unifiedNotchRoot
-            property: "targetW"
-            to: unifiedNotchRoot.compactWidth
-            duration: 220
-            easing.type: Easing.InOutCubic
-        }
-        NumberAnimation {
-            target: unifiedNotchRoot
-            property: "targetH"
-            to: unifiedNotchRoot.compactHeight
-            duration: 220
-            easing.type: Easing.InOutCubic
-        }
-        NumberAnimation {
-            target: unifiedNotchRoot
-            property: "cornerRadius"
-            to: isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius
-            duration: 220
+            property: "collapseProgress"
+            from: 0.0
+            to: 1.0
+            duration: 300
             easing.type: Easing.InOutCubic
         }
 
         onFinished: {
             unifiedNotchRoot.isClosing = false;
+            unifiedNotchRoot.resetGeometryBindings();
             unifiedNotchRoot.collapseCompleted();
             unifiedNotchRoot.collapseFinished();
         }
@@ -423,15 +450,7 @@ Item {
 
         onFinished: {
             unifiedNotchRoot.isOpening = false;
-            unifiedNotchRoot.targetW = Qt.binding(function() {
-                return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics) : unifiedNotchRoot.compactWidth;
-            });
-            unifiedNotchRoot.targetH = Qt.binding(function() {
-                return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
-            });
-            unifiedNotchRoot.cornerRadius = Qt.binding(function() {
-                return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : (unifiedNotchRoot.isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius);
-            });
+            unifiedNotchRoot.resetGeometryBindings();
             expandedContent.opacity = 1.0;
         }
     }
@@ -442,6 +461,10 @@ Item {
             openSequenceAnimation.stop();
             isOpening = false;
         }
+        animStartW = targetW;
+        animStartH = targetH;
+        animStartR = cornerRadius;
+        collapseProgress = 0.0;
         isClosing = true;
         closeSequenceAnimation.restart();
     }
@@ -469,15 +492,8 @@ Item {
     }
 
     function resetGeometryAfterUnmap() {
-        targetW = Qt.binding(function() {
-            return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.getTargetWidthForTab(unifiedNotchRoot.currentExpandedTab, unifiedNotchRoot.showLyrics) : unifiedNotchRoot.compactWidth;
-        });
-        targetH = Qt.binding(function() {
-            return unifiedNotchRoot.isExpanded ? unifiedNotchRoot.standardCardHeight : unifiedNotchRoot.compactHeight;
-        });
-        cornerRadius = Qt.binding(function() {
-            return (unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isClosing) ? 22 : (unifiedNotchRoot.isFloatingStyle ? (unifiedNotchRoot.compactHeight / 2) : unifiedNotchRoot.cfgNotchBottomRadius);
-        });
+        collapseProgress = 0.0;
+        resetGeometryBindings();
         expandedContent.opacity = unifiedNotchRoot.isExpanded ? 1.0 : 0.0;
         bodyOpacity = 1.0;
     }
@@ -551,7 +567,7 @@ Item {
             // 2. Dinding vertikal kiri turun ke bawah
             PathLine {
                 x: unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
+                y: Math.max(unifiedNotchRoot.wingRadius, unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius)
             }
 
             // 3. Sudut cembung kiri bawah
@@ -565,14 +581,14 @@ Item {
 
             // 4. Garis horizontal dasar notch
             PathLine {
-                x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius - unifiedNotchRoot.cornerRadius
+                x: Math.max(unifiedNotchRoot.wingRadius + unifiedNotchRoot.cornerRadius, unifiedNotchRoot.width - unifiedNotchRoot.wingRadius - unifiedNotchRoot.cornerRadius)
                 y: unifiedNotchRoot.targetH
             }
 
             // 5. Sudut cembung kanan bawah
             PathArc {
                 x: unifiedNotchRoot.width - unifiedNotchRoot.wingRadius
-                y: unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius
+                y: Math.max(unifiedNotchRoot.wingRadius, unifiedNotchRoot.targetH - unifiedNotchRoot.cornerRadius)
                 radiusX: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 radiusY: Math.max(0.1, unifiedNotchRoot.cornerRadius)
                 direction: PathArc.Counterclockwise
@@ -620,8 +636,21 @@ Item {
             height: unifiedNotchRoot.compactHeight
 
             visible: opacity > 0
-            opacity: (unifiedNotchRoot.isExpanded || unifiedNotchRoot.isOverlayDialog) ? 0.0 : 1.0
-            Behavior on opacity { NumberAnimation { duration: 180 } }
+            opacity: {
+                if (unifiedNotchRoot.isClosing) {
+                    if (unifiedNotchRoot.collapseProgress <= 0.45) return 0.0;
+                    return Math.min(1.0, (unifiedNotchRoot.collapseProgress - 0.45) / 0.55);
+                }
+                if (unifiedNotchRoot.isExpanded) {
+                    if (unifiedNotchRoot.collapseProgress >= 0.99) return 1.0;
+                    return 0.0;
+                }
+                return 1.0;
+            }
+            Behavior on opacity {
+                enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening
+                NumberAnimation { duration: 180 }
+            }
 
             // State 1: Notification Pill
             NotificationPill {

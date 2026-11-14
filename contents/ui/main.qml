@@ -1514,7 +1514,7 @@ PlasmoidItem {
     // Timer Fallback Penutupan Dialog (Mencegah Deadlock):
     Timer {
         id: closeWatchdogTimer
-        interval: 450 // Sedikit lebih lama dari durasi animasi close 220ms + handover 32ms
+        interval: 550 // Sedikit lebih lama dari durasi animasi close 300ms + handover 32ms
         repeat: false
         onTriggered: {
             if (!root.isExpanded || (expandedCardPanel && expandedCardPanel.isClosing)) {
