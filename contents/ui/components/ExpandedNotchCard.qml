@@ -305,6 +305,11 @@ Item {
     opacity: 1.0
 
     readonly property bool isMorphing: widthAnim.running || heightAnim.running || closeSequenceAnimation.running || openSequenceAnimation.running
+    readonly property bool isInteracting: {
+        if (isClosing || isOpening || isMorphing) return true;
+        if (tabLoader && tabLoader.item && tabLoader.item.isDragging) return true;
+        return false;
+    }
 
     Behavior on targetW {
         enabled: !unifiedNotchRoot.isClosing && !unifiedNotchRoot.isOpening

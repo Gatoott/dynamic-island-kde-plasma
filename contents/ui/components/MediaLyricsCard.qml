@@ -67,6 +67,15 @@ Item {
     property color albumDominantColor: Qt.color("#1a2b3c")
     Behavior on albumDominantColor { ColorAnimation { duration: 400 } }
 
+    readonly property bool isDragging: {
+        if (typeof seekMouseArea !== "undefined" && seekMouseArea.pressed) return true;
+        if (typeof miniSeekMouseArea !== "undefined" && miniSeekMouseArea.pressed) return true;
+        if (typeof mainVolumeControl !== "undefined" && mainVolumeControl.isPressed) return true;
+        if (typeof miniVolumeControl !== "undefined" && miniVolumeControl.isPressed) return true;
+        if (typeof lyricsListView !== "undefined" && (lyricsListView.dragging || lyricsListView.flicking)) return true;
+        return false;
+    }
+
     signal requestPlayPause()
     signal requestNext()
     signal requestPrevious()
@@ -485,6 +494,7 @@ Item {
                     }
 
                     MouseArea {
+                        id: seekMouseArea
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         preventStealing: true
@@ -532,6 +542,7 @@ Item {
 
                 // Volume Button with Hover Slider on Left side
                 VolumeHoverControl {
+                    id: mainVolumeControl
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     controlHeight: 32
@@ -820,6 +831,7 @@ Item {
                         }
 
                         MouseArea {
+                            id: miniSeekMouseArea
                             anchors.fill: parent
                             cursorShape: Qt.PointingHandCursor
                             preventStealing: true
@@ -936,6 +948,7 @@ Item {
 
                     // Volume Hover Control di mode lirik
                     VolumeHoverControl {
+                        id: miniVolumeControl
                         anchors.right: parent.right
                         anchors.rightMargin: 4
                         anchors.verticalCenter: parent.verticalCenter

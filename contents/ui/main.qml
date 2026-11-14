@@ -1536,6 +1536,89 @@ PlasmoidItem {
         }
     }
 
+    // --- Expand on Hover Logic & Timers ---
+    readonly property bool isMorphing: (expandedCardPanel && expandedCardPanel.isMorphing) || (desktopLivingNotch && desktopLivingNotch.isMorphing)
+    readonly property bool isInteractingAny: {
+        var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+        return card ? Boolean(card.isInteracting) : false;
+    }
+
+    readonly property bool pillHovered: root.inPanel
+        ? (typeof panelPillHoverHandler !== "undefined" && panelPillHoverHandler.hovered)
+        : (!root.isExpanded && typeof desktopHoverHandler !== "undefined" && desktopHoverHandler.hovered)
+    readonly property bool cardHovered: root.inPanel
+        ? (typeof cardHoverHandler !== "undefined" && cardHoverHandler.hovered)
+        : (root.isExpanded && typeof desktopHoverHandler !== "undefined" && desktopHoverHandler.hovered)
+    readonly property bool isHoveredCombined: pillHovered || cardHovered
+
+    onIsHoveredCombinedChanged: {
+        if (!root.cfgExpandOnHover) return;
+
+        if (root.isHoveredCombined) {
+            // Pointer berada di atas pill atau kartu: batalkan countdown penutupan
+            if (hoverCloseTimer.running) {
+                hoverCloseTimer.stop();
+            }
+            // Jika notch tertutup, mulai countdown pembukaan (150-250ms)
+            if (!root.isExpanded && !root.isMorphing &&
+                !(expandedCardPanel && (expandedCardPanel.isClosing || expandedCardPanel.isOpening))) {
+                hoverOpenTimer.restart();
+            }
+        } else {
+            // Pointer meninggalkan pill/kartu: batalkan pembukaan jika cepat lewat
+            if (hoverOpenTimer.running) {
+                hoverOpenTimer.stop();
+            }
+            // Jika notch terbuka, mulai countdown penutupan (300-500ms) jika tidak sedang interaksi/drag
+            if (root.isExpanded && !root.isMorphing && !root.isInteractingAny &&
+                !(expandedCardPanel && (expandedCardPanel.isClosing || expandedCardPanel.isOpening))) {
+                hoverCloseTimer.restart();
+            }
+        }
+    }
+
+    onIsInteractingAnyChanged: {
+        if (!root.cfgExpandOnHover) return;
+        // Jika interaksi/drag selesai dan pointer sudah di luar kartu, jalankan timer penutup
+        if (!root.isInteractingAny && !root.isHoveredCombined && root.isExpanded &&
+            !(expandedCardPanel && (expandedCardPanel.isClosing || expandedCardPanel.isOpening))) {
+            hoverCloseTimer.restart();
+        }
+    }
+
+    onCfgExpandOnHoverChanged: {
+        if (!cfgExpandOnHover) {
+            if (hoverOpenTimer.running) hoverOpenTimer.stop();
+            if (hoverCloseTimer.running) hoverCloseTimer.stop();
+        }
+    }
+
+    Timer {
+        id: hoverOpenTimer
+        interval: 200 // 150-250 ms delay sebelum membuka notch
+        repeat: false
+        onTriggered: {
+            if (root.cfgExpandOnHover && root.isHoveredCombined && !root.isExpanded && !root.isMorphing &&
+                !(expandedCardPanel && (expandedCardPanel.isClosing || expandedCardPanel.isOpening))) {
+                console.log("[NOTCH_HOVER] Hover 200ms stabil pada compact pill, membuka notch...");
+                root.openNotch();
+            }
+        }
+    }
+
+    Timer {
+        id: hoverCloseTimer
+        interval: 350 // 300-500 ms delay sebelum menutup notch setelah pointer keluar
+        repeat: false
+        onTriggered: {
+            if (root.cfgExpandOnHover && !root.isHoveredCombined && root.isExpanded && !root.isInteractingAny &&
+                !(expandedCardPanel && (expandedCardPanel.isClosing || expandedCardPanel.isOpening))) {
+                console.log("[NOTCH_HOVER] Pointer meninggalkan kartu & pill selama 350ms, menutup notch...");
+                root.triggerCollapseSequence();
+            }
+        }
+    }
+
     // Jarak atas nyata compact pill terhadap tepi atas layar (px)
     property int measuredPillTop: 0
 
@@ -1632,6 +1715,8 @@ PlasmoidItem {
     }
 
     function openNotch(targetTabIndex) {
+        if (hoverOpenTimer.running) hoverOpenTimer.stop();
+        if (hoverCloseTimer.running) hoverCloseTimer.stop();
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
@@ -1712,6 +1797,8 @@ PlasmoidItem {
     }
 
     function triggerCollapseSequence() {
+        if (hoverOpenTimer.running) hoverOpenTimer.stop();
+        if (hoverCloseTimer.running) hoverCloseTimer.stop();
         var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
         if (card.isClosing || !root.isExpanded) return;
 
@@ -1724,6 +1811,8 @@ PlasmoidItem {
     }
 
     function toggleExpanded(targetTab) {
+        if (hoverOpenTimer.running) hoverOpenTimer.stop();
+        if (hoverCloseTimer.running) hoverCloseTimer.stop();
         var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
         if (card.isClosing || card.isOpening) return;
 
@@ -1753,6 +1842,12 @@ PlasmoidItem {
 
         opacity: root.compactVisible ? 1.0 : 0.0
         enabled: root.compactVisible && !root.isExpanded && !(expandedCardPanel && expandedCardPanel.isClosing) && !(expandedCardPanel && expandedCardPanel.isOpening)
+
+        HoverHandler {
+            id: panelPillHoverHandler
+            enabled: root.cfgExpandOnHover && !root.isExpanded && root.compactVisible
+            margin: 6
+        }
 
         CompactView {
             id: panelCompactNotch
@@ -1895,6 +1990,20 @@ PlasmoidItem {
                     if (!expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
                         root.triggerCollapseSequence();
                     }
+                }
+            }
+
+            Item {
+                id: cardHoverZone
+                anchors.top: parent.top
+                anchors.bottom: expandedCardPanel.bottom
+                anchors.left: expandedCardPanel.left
+                anchors.right: expandedCardPanel.right
+
+                HoverHandler {
+                    id: cardHoverHandler
+                    enabled: root.cfgExpandOnHover && root.dialogSurfaceOpen
+                    margin: 8
                 }
             }
 
@@ -2062,6 +2171,12 @@ PlasmoidItem {
         anchors.topMargin: root.effectiveCardTopMargin
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
+
+        HoverHandler {
+            id: desktopHoverHandler
+            enabled: root.cfgExpandOnHover && !root.inPanel
+            margin: 6
+        }
 
         onYChanged: root.updateMeasuredPillTop()
 

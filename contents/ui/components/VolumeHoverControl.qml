@@ -21,6 +21,9 @@ Item {
     implicitHeight: controlHeight
 
     readonly property bool isExpanded: volHoverMa.containsMouse || volSliderMa.pressed || speakerIconMa.containsMouse
+    readonly property bool isPressed: (typeof volSliderMa !== "undefined" && volSliderMa.pressed) ||
+                                     (typeof volHoverMa !== "undefined" && volHoverMa.pressed) ||
+                                     (typeof speakerIconMa !== "undefined" && speakerIconMa.pressed)
 
     Behavior on implicitWidth {
         NumberAnimation { duration: 180; easing.type: Easing.OutCubic }

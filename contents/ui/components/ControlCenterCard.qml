@@ -28,6 +28,9 @@ Item {
     property bool batteryCharging: false
     property int batteryTemp: 30
 
+    readonly property bool isDragging: (typeof volSliderMa !== "undefined" && (volSliderMa.pressed || volSliderMa.isDraggingH)) ||
+                                      (typeof brightSliderMa !== "undefined" && (brightSliderMa.pressed || brightSliderMa.isDraggingH))
+
     // Signals
     signal requestSwitchToMedia()
     signal requestToggleMode()
@@ -962,6 +965,7 @@ Item {
                     }
 
                     MouseArea {
+                        id: volSliderMa
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         preventStealing: false
@@ -1061,6 +1065,7 @@ Item {
                     }
 
                     MouseArea {
+                        id: brightSliderMa
                         anchors.fill: parent
                         cursorShape: Qt.PointingHandCursor
                         preventStealing: false
