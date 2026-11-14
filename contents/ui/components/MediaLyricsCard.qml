@@ -1011,21 +1011,80 @@ Item {
                 spacing: 6
                 model: mediaCardRoot.lyricsList
                 reuseItems: true
-                cacheBuffer: 80
+                cacheBuffer: 240
                 currentIndex: mediaCardRoot.currentLyricIndex
-                preferredHighlightBegin: height * 0.5 - 12
-                preferredHighlightEnd: height * 0.5 + 12
-                highlightRangeMode: ListView.StrictlyEnforceRange
-                highlightMoveDuration: 220
+                highlightRangeMode: ListView.NoHighlightRange
+                highlightMoveDuration: 0
+                topMargin: Math.round(height * 0.5 - 14)
+                bottomMargin: Math.round(height * 0.5 - 14)
+
+                property int lastLyricIndex: -1
+
+                NumberAnimation {
+                    id: scrollAnimation
+                    target: lyricsListView
+                    property: "contentY"
+                    duration: 380
+                    easing.type: Easing.OutCubic
+                }
+
+                function scrollToCurrentIndex(newIdx) {
+                    if (newIdx < 0 || newIdx >= count) return;
+                    if (lyricsListView.dragging || lyricsListView.flicking) return;
+
+                    var prevIdx = lastLyricIndex;
+                    lastLyricIndex = newIdx;
+
+                    // Pindah banyak baris sekaligus (seek, klik baris, ganti lagu) atau inisialisasi awal
+                    if (prevIdx < 0 || Math.abs(newIdx - prevIdx) > 3) {
+                        scrollAnimation.stop();
+                        positionViewAtIndex(newIdx, ListView.Center);
+                        return;
+                    }
+
+                    // Pindah baris berdekatan (playback normal): scroll mulus ala Apple Music
+                    var it = itemAtIndex(newIdx);
+                    if (!it) {
+                        scrollAnimation.stop();
+                        positionViewAtIndex(newIdx, ListView.Center);
+                        return;
+                    }
+
+                    var rawTargetY = it.y + (it.height / 2) - (height / 2);
+                    var minY = -topMargin;
+                    var maxY = Math.max(minY, contentHeight + bottomMargin - height);
+                    var targetY = Math.max(minY, Math.min(maxY, rawTargetY));
+
+                    if (Math.abs(targetY - contentY) < 0.5) return;
+
+                    scrollAnimation.stop();
+                    scrollAnimation.from = contentY;
+                    scrollAnimation.to = targetY;
+                    scrollAnimation.restart();
+                }
 
                 onCurrentIndexChanged: {
+                    scrollToCurrentIndex(currentIndex);
+                }
+
+                onCountChanged: {
+                    scrollAnimation.stop();
+                    lastLyricIndex = currentIndex;
                     if (currentIndex >= 0 && currentIndex < count) {
                         positionViewAtIndex(currentIndex, ListView.Center);
                     }
                 }
-                onCountChanged: {
-                    if (currentIndex >= 0 && currentIndex < count) {
-                        positionViewAtIndex(currentIndex, ListView.Center);
+
+                Connections {
+                    target: mediaCardRoot
+                    function onShowLyricsChanged() {
+                        if (mediaCardRoot.showLyrics) {
+                            scrollAnimation.stop();
+                            lyricsListView.lastLyricIndex = -1;
+                            if (lyricsListView.currentIndex >= 0 && lyricsListView.currentIndex < lyricsListView.count) {
+                                lyricsListView.positionViewAtIndex(lyricsListView.currentIndex, ListView.Center);
+                            }
+                        }
                     }
                 }
 
@@ -1049,7 +1108,7 @@ Item {
                     }
                     property real animatedBlur: rawBlur
                     Behavior on animatedBlur {
-                        NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
+                        NumberAnimation { duration: 380; easing.type: Easing.OutCubic }
                     }
 
                     // Warna redup simetris: baris aktif #ffffff,
@@ -1067,12 +1126,12 @@ Item {
                         width: parent.width
                         text: (modelData && modelData.text !== undefined) ? modelData.text : (modelData || "")
                         wrapMode: Text.WordWrap
-                        font.pixelSize: lyricDelegate.isCurrent ? 15 : 13
-                        font.bold: lyricDelegate.isCurrent
+                        font.pixelSize: mediaCardRoot.lyricsFontSize > 0 ? mediaCardRoot.lyricsFontSize : 13
+                        font.bold: mediaCardRoot.lyricsFontBold
                         font.family: mediaCardRoot.lyricsFontFamily !== "" ? mediaCardRoot.lyricsFontFamily : "Inter, Roboto, sans-serif"
                         color: lyricDelegate.targetColor
                         horizontalAlignment: Text.AlignLeft
-                        scale: lyricDelegate.isCurrent ? 1.02 : 1.0
+                        scale: lyricDelegate.isCurrent ? 1.05 : 1.0
                         transformOrigin: Item.Left
 
                         // GPU Shader blur hanya aktif saat baris memiliki blur (> 0.01)
@@ -1083,9 +1142,8 @@ Item {
                             blurMax: 16
                         }
 
-                        Behavior on color { ColorAnimation { duration: 220; easing.type: Easing.OutQuad } }
-                        Behavior on font.pixelSize { NumberAnimation { duration: 180 } }
-                        Behavior on scale { NumberAnimation { duration: 180 } }
+                        Behavior on color { ColorAnimation { duration: 380; easing.type: Easing.OutCubic } }
+                        Behavior on scale { NumberAnimation { duration: 380; easing.type: Easing.OutCubic } }
                     }
 
                     MouseArea {
