@@ -1516,6 +1516,8 @@ PlasmoidItem {
                 expandedDialog.visible = false;
                 root.dialogSurfaceOpen = false;
                 root.isExpanded = false;
+                root.pointerPositionConfirmed = false;
+                root.isPointerInsideCard = false;
             }
         }
     }
@@ -1529,6 +1531,8 @@ PlasmoidItem {
             expandedDialog.visible = false;
             root.dialogSurfaceOpen = false;
             root.isExpanded = false;
+            root.pointerPositionConfirmed = false;
+            root.isPointerInsideCard = false;
             if (expandedCardPanel) {
                 expandedCardPanel.isClosing = false;
                 expandedCardPanel.resetGeometryAfterUnmap();
@@ -1537,6 +1541,11 @@ PlasmoidItem {
     }
 
     // --- Expand on Hover Logic & Timers ---
+    property real lastPointerX: -1
+    property real lastPointerY: -1
+    property bool pointerPositionConfirmed: false
+    property bool isPointerInsideCard: true
+
     readonly property bool isMorphing: (expandedCardPanel && expandedCardPanel.isMorphing) || (desktopLivingNotch && desktopLivingNotch.isMorphing)
     readonly property bool isInteractingAny: {
         var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
@@ -1546,10 +1555,51 @@ PlasmoidItem {
     readonly property bool pillHovered: root.inPanel
         ? (typeof panelPillHoverHandler !== "undefined" && panelPillHoverHandler.hovered)
         : (!root.isExpanded && typeof desktopHoverHandler !== "undefined" && desktopHoverHandler.hovered)
-    readonly property bool cardHovered: root.inPanel
-        ? (typeof cardHoverHandler !== "undefined" && cardHoverHandler.hovered)
-        : (root.isExpanded && typeof desktopHoverHandler !== "undefined" && desktopHoverHandler.hovered)
+    readonly property bool cardHovered: {
+        if (!root.inPanel) {
+            return root.isExpanded && typeof desktopHoverHandler !== "undefined" && desktopHoverHandler.hovered;
+        }
+        if (!root.dialogSurfaceOpen || !root.isExpanded) {
+            return false;
+        }
+        if (!root.pointerPositionConfirmed) {
+            return true;
+        }
+        if (typeof overlayHoverHandler !== "undefined" && !overlayHoverHandler.hovered) {
+            return false;
+        }
+        return root.isPointerInsideCard;
+    }
     readonly property bool isHoveredCombined: pillHovered || cardHovered
+
+    function checkPointerInsideCard(px, py) {
+        if (!expandedCardPanel || typeof fixedCanvas === "undefined") return false;
+        var tol = 16;
+        var centerX = (fixedCanvas.width / 2) + root.cfgHorizontalOffset;
+        var targetW = expandedCardPanel.isFloatingStyle ? expandedCardPanel.targetW : (expandedCardPanel.targetW + (expandedCardPanel.effectiveWingRadius * 2));
+        var cardW = Math.max(expandedCardPanel.width, targetW);
+        var targetH = expandedCardPanel.standardCardHeight;
+        var cardH = Math.max(expandedCardPanel.height, targetH);
+
+        var cardLeft = (centerX - (cardW / 2)) - tol;
+        var cardRight = (centerX + (cardW / 2)) + tol;
+        var cardTop = 0;
+        var cardBottom = root.effectiveCardTopMargin + cardH + tol;
+
+        return (px >= cardLeft && px <= cardRight && py >= cardTop && py <= cardBottom);
+    }
+
+    function handleOverlayPointerMove(px, py) {
+        root.lastPointerX = px;
+        root.lastPointerY = py;
+        root.pointerPositionConfirmed = true;
+        root.isPointerInsideCard = root.checkPointerInsideCard(px, py);
+    }
+
+    function handleOverlayPointerLeave() {
+        root.pointerPositionConfirmed = true;
+        root.isPointerInsideCard = false;
+    }
 
     onIsHoveredCombinedChanged: {
         if (!root.cfgExpandOnHover) return;
@@ -1717,6 +1767,8 @@ PlasmoidItem {
     function openNotch(targetTabIndex) {
         if (hoverOpenTimer.running) hoverOpenTimer.stop();
         if (hoverCloseTimer.running) hoverCloseTimer.stop();
+        root.pointerPositionConfirmed = false;
+        root.isPointerInsideCard = true;
         if (closeWatchdogTimer.running) {
             closeWatchdogTimer.stop();
         }
@@ -1799,6 +1851,8 @@ PlasmoidItem {
     function triggerCollapseSequence() {
         if (hoverOpenTimer.running) hoverOpenTimer.stop();
         if (hoverCloseTimer.running) hoverCloseTimer.stop();
+        root.pointerPositionConfirmed = false;
+        root.isPointerInsideCard = false;
         var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
         if (card.isClosing || !root.isExpanded) return;
 
@@ -1982,6 +2036,17 @@ PlasmoidItem {
             width: parent.width
             height: parent.height
 
+            HoverHandler {
+                id: overlayHoverHandler
+                enabled: root.cfgExpandOnHover && root.dialogSurfaceOpen
+                onPointChanged: root.handleOverlayPointerMove(point.position.x, point.position.y)
+                onHoveredChanged: {
+                    if (!hovered) {
+                        root.handleOverlayPointerLeave();
+                    }
+                }
+            }
+
             // Klik di area kanvas transparan di luar livingNotch untuk menutup
             MouseArea {
                 anchors.fill: parent
@@ -1990,20 +2055,6 @@ PlasmoidItem {
                     if (!expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {
                         root.triggerCollapseSequence();
                     }
-                }
-            }
-
-            Item {
-                id: cardHoverZone
-                anchors.top: parent.top
-                anchors.bottom: expandedCardPanel.bottom
-                anchors.left: expandedCardPanel.left
-                anchors.right: expandedCardPanel.right
-
-                HoverHandler {
-                    id: cardHoverHandler
-                    enabled: root.cfgExpandOnHover && root.dialogSurfaceOpen
-                    margin: 8
                 }
             }
 
