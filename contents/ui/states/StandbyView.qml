@@ -44,14 +44,14 @@ Item {
         anchors.centerIn: parent
         spacing: 7
 
-        // Music note icon (♫) on the left of clock
-        Text {
+        // Music note icon on the left of clock
+        SFSymbolIcon {
             id: musicNoteIcon
-            text: "♫"
+            name: "music.note.beamed"
             visible: standbyRoot.miniMusicIconEnabled && standbyRoot.isPlaying
-            font.pixelSize: standbyRoot.miniMusicIconSize
-            font.weight: standbyRoot.miniMusicIconWeight
-            verticalAlignment: Text.AlignVCenter
+            width: standbyRoot.miniMusicIconSize
+            height: standbyRoot.miniMusicIconSize
+            weight: standbyRoot.miniMusicIconWeight
             Layout.alignment: Qt.AlignVCenter
 
             // Logika Warna Dinamis:

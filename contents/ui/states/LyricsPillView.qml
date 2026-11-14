@@ -78,14 +78,14 @@ Item {
         anchors.topMargin: 2
         spacing: 8
 
-        // Music note icon (♫) on the left of lyrics (Synchronized with StandbyView)
-        Text {
+        // Music note icon on the left of lyrics (Synchronized with StandbyView)
+        SFSymbolIcon {
             id: standbyLyricsMusicIcon
-            text: "♫"
+            name: "music.note.beamed"
             visible: lyricsPillRoot.miniMusicIconEnabled && lyricsPillRoot.isPlaying
-            font.pixelSize: lyricsPillRoot.miniMusicIconSize
-            font.weight: lyricsPillRoot.miniMusicIconWeight
-            verticalAlignment: Text.AlignVCenter
+            width: lyricsPillRoot.miniMusicIconSize
+            height: lyricsPillRoot.miniMusicIconSize
+            weight: lyricsPillRoot.miniMusicIconWeight
             Layout.alignment: Qt.AlignVCenter
 
             // Dynamic color logic:

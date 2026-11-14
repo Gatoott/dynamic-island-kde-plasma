@@ -7,14 +7,18 @@ Canvas {
     property color color: "#ffffff"
     property real strokeWidth: 1.8
     property color circleColor: Qt.rgba(1, 1, 1, 0.16)
+    property int weight: 400
 
     width: 16
     height: 16
+    implicitWidth: width
+    implicitHeight: height
 
     onNameChanged: requestPaint()
     onColorChanged: requestPaint()
     onStrokeWidthChanged: requestPaint()
     onCircleColorChanged: requestPaint()
+    onWeightChanged: requestPaint()
     onWidthChanged: requestPaint()
     onHeightChanged: requestPaint()
 
@@ -301,6 +305,65 @@ Canvas {
             ctx.lineTo(w * 0.52, h * 0.18);
             ctx.bezierCurveTo(w * 0.74, h * 0.20, w * 0.84, h * 0.38, w * 0.82, h * 0.56);
             ctx.stroke();
+        } else if (name === "music.note.beamed") {
+            ctx.fillStyle = iconCanvas.color;
+
+            var sBeamed = Math.min(w, h);
+            var wtBeamed = iconCanvas.weight > 0 ? iconCanvas.weight : (iconCanvas.strokeWidth > 0 ? Math.round(iconCanvas.strokeWidth * 250) : 400);
+            var tBeamed = Math.max(0.0, Math.min(1.0, (wtBeamed - 300) / 600.0));
+            var scaleBeamed = sBeamed / 14.0;
+
+            // Pemetaan ketebalan tangkai & balok (1.0..3.2 px pada base size 14px)
+            var stemW = Math.max(0.8, (1.0 + tBeamed * 1.8) * scaleBeamed);
+            var beamH = Math.max(1.0, (1.3 + tBeamed * 2.1) * scaleBeamed);
+            var headR = (1.8 + tBeamed * 1.1) * scaleBeamed;
+
+            // Sudut kemiringan kepala not (~ -22 derajat)
+            var angleBeamed = -22.0 * Math.PI / 180.0;
+            var x1 = w * 0.26;
+            var y1 = h * 0.75;
+            var x2 = w * 0.70;
+            var y2 = h * 0.63;
+
+            // Kepala not 1 (kiri)
+            ctx.save();
+            ctx.translate(x1, y1);
+            ctx.rotate(angleBeamed);
+            ctx.scale(1.25, 0.90);
+            ctx.beginPath();
+            ctx.arc(0, 0, headR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Kepala not 2 (kanan)
+            ctx.save();
+            ctx.translate(x2, y2);
+            ctx.rotate(angleBeamed);
+            ctx.scale(1.25, 0.90);
+            ctx.beginPath();
+            ctx.arc(0, 0, headR, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+
+            // Tangkai dan Balok Penyambung (Seamless Polygon)
+            var stem1R = x1 + headR * 0.95;
+            var stem1L = stem1R - stemW;
+            var stem2R = x2 + headR * 0.95;
+            var stem2L = stem2R - stemW;
+            var beam1Y = h * 0.16;
+            var beam2Y = h * 0.08;
+
+            ctx.beginPath();
+            ctx.moveTo(stem1L, y1);
+            ctx.lineTo(stem1L, beam1Y);
+            ctx.lineTo(stem2R, beam2Y);
+            ctx.lineTo(stem2R, y2);
+            ctx.lineTo(stem2L, y2);
+            ctx.lineTo(stem2L, beam2Y + beamH);
+            ctx.lineTo(stem1R, beam1Y + beamH);
+            ctx.lineTo(stem1R, y1);
+            ctx.closePath();
+            ctx.fill();
         } else if (name === "timer") {
             ctx.strokeStyle = iconCanvas.color;
             ctx.lineWidth = iconCanvas.strokeWidth;
