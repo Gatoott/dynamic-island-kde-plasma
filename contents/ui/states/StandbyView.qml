@@ -31,31 +31,11 @@ Item {
     property bool visualizerServiceActive: false
 
     // Mini Music Icon (Left of Clock) Customization
-    property bool miniMusicIconEnabled: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) return plasmoid.configuration.miniMusicIconEnabled;
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) return Plasmoid.configuration.miniMusicIconEnabled;
-        return true;
-    }
-    property int miniMusicIconSize: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) return plasmoid.configuration.miniMusicIconSize;
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) return Plasmoid.configuration.miniMusicIconSize;
-        return 13;
-    }
-    property int miniMusicIconWeight: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) return plasmoid.configuration.miniMusicIconWeight;
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) return Plasmoid.configuration.miniMusicIconWeight;
-        return 600;
-    }
-    property int miniMusicIconColorMode: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) return plasmoid.configuration.miniMusicIconColorMode;
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) return Plasmoid.configuration.miniMusicIconColorMode;
-        return 0;
-    }
-    property color miniMusicIconCustomColor: {
-        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(plasmoid.configuration.miniMusicIconCustomColor);
-        if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) return Qt.color(Plasmoid.configuration.miniMusicIconCustomColor);
-        return Qt.color("#ffffff");
-    }
+    property bool miniMusicIconEnabled: true
+    property int miniMusicIconSize: 13
+    property int miniMusicIconWeight: 600
+    property int miniMusicIconColorMode: 0
+    property color miniMusicIconCustomColor: "#ffffff"
 
     implicitHeight: 34
 
@@ -68,50 +48,15 @@ Item {
         Text {
             id: musicNoteIcon
             text: "♫"
-            visible: {
-                var en = true;
-                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconEnabled !== undefined) {
-                    en = plasmoid.configuration.miniMusicIconEnabled;
-                } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconEnabled !== undefined) {
-                    en = Plasmoid.configuration.miniMusicIconEnabled;
-                } else {
-                    en = standbyRoot.miniMusicIconEnabled;
-                }
-                return en && standbyRoot.isPlaying;
-            }
-            font.pixelSize: {
-                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconSize !== undefined) {
-                    return plasmoid.configuration.miniMusicIconSize;
-                }
-                if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconSize !== undefined) {
-                    return Plasmoid.configuration.miniMusicIconSize;
-                }
-                return (standbyRoot.miniMusicIconSize !== undefined) ? standbyRoot.miniMusicIconSize : 13;
-            }
-            font.weight: {
-                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconWeight !== undefined) {
-                    return plasmoid.configuration.miniMusicIconWeight;
-                }
-                if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconWeight !== undefined) {
-                    return Plasmoid.configuration.miniMusicIconWeight;
-                }
-                return (standbyRoot.miniMusicIconWeight !== undefined) ? standbyRoot.miniMusicIconWeight : 600;
-            }
+            visible: standbyRoot.miniMusicIconEnabled && standbyRoot.isPlaying
+            font.pixelSize: standbyRoot.miniMusicIconSize
+            font.weight: standbyRoot.miniMusicIconWeight
             verticalAlignment: Text.AlignVCenter
             Layout.alignment: Qt.AlignVCenter
 
             // Logika Warna Dinamis:
             color: {
-                var cMode = 0;
-                if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconColorMode !== undefined) {
-                    cMode = plasmoid.configuration.miniMusicIconColorMode;
-                } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconColorMode !== undefined) {
-                    cMode = Plasmoid.configuration.miniMusicIconColorMode;
-                } else {
-                    cMode = standbyRoot.miniMusicIconColorMode;
-                }
-
-                switch (cMode) {
+                switch (standbyRoot.miniMusicIconColorMode) {
                     case 0: // Warna cover album dinamis
                         if (standbyRoot.albumColor && standbyRoot.albumColor != "" && standbyRoot.albumColor != "#000000" && standbyRoot.albumColor != "transparent") {
                             return standbyRoot.albumColor;
@@ -122,15 +67,7 @@ Item {
                     case 2: // Putih / Abu redup
                         return Qt.rgba(1, 1, 1, 0.75);
                     case 3: // Warna kustom dari color picker
-                        var cust = null;
-                        if (typeof plasmoid !== "undefined" && plasmoid && plasmoid.configuration && plasmoid.configuration.miniMusicIconCustomColor) {
-                            cust = plasmoid.configuration.miniMusicIconCustomColor;
-                        } else if (typeof Plasmoid !== "undefined" && Plasmoid && Plasmoid.configuration && Plasmoid.configuration.miniMusicIconCustomColor) {
-                            cust = Plasmoid.configuration.miniMusicIconCustomColor;
-                        } else {
-                            cust = standbyRoot.miniMusicIconCustomColor;
-                        }
-                        return cust ? Qt.color(cust) : "#ffffff";
+                        return standbyRoot.miniMusicIconCustomColor;
                     default:
                         return "#ffffff";
                 }

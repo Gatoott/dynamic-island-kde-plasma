@@ -84,17 +84,28 @@ PlasmoidItem {
     readonly property int cfgMediaCardBgMode: Plasmoid.configuration.mediaBgStyle !== undefined ? Plasmoid.configuration.mediaBgStyle : (Plasmoid.configuration.mediaCardBgMode !== undefined ? Plasmoid.configuration.mediaCardBgMode : 2)
     readonly property int cfgLyricsBgMode: Plasmoid.configuration.lyricsBgMode !== undefined ? Plasmoid.configuration.lyricsBgMode : 1
 
+    function parseKConfigColor(val, fallback) {
+        if (!val) return Qt.color(fallback);
+        if (typeof val === "string" && val.indexOf(",") !== -1) {
+            var parts = val.split(",");
+            if (parts.length >= 3) {
+                return Qt.rgba(parseFloat(parts[0]) / 255.0, parseFloat(parts[1]) / 255.0, parseFloat(parts[2]) / 255.0, 1.0);
+            }
+        }
+        return Qt.color(val);
+    }
+
     // Mini Music Icon (Left of Clock) Customization
     readonly property bool cfgMiniMusicIconEnabled: Plasmoid.configuration.miniMusicIconEnabled !== undefined ? Plasmoid.configuration.miniMusicIconEnabled : true
     readonly property int cfgMiniMusicIconSize: Plasmoid.configuration.miniMusicIconSize || 13
     readonly property int cfgMiniMusicIconWeight: Plasmoid.configuration.miniMusicIconWeight || 600
     readonly property int cfgMiniMusicIconColorMode: Plasmoid.configuration.miniMusicIconColorMode !== undefined ? Plasmoid.configuration.miniMusicIconColorMode : 0
-    readonly property color cfgMiniMusicIconCustomColor: Qt.color(Plasmoid.configuration.miniMusicIconCustomColor || "#ffffff")
+    readonly property color cfgMiniMusicIconCustomColor: root.parseKConfigColor(Plasmoid.configuration.miniMusicIconCustomColor, "#ffffff")
 
     // Mini Visualizer (Compact Pill) Customization
     readonly property int cfgMiniVisAlignment: Plasmoid.configuration.miniVisAlignment !== undefined ? Plasmoid.configuration.miniVisAlignment : 1
     readonly property int cfgMiniVisColorMode: Plasmoid.configuration.miniVisColorMode !== undefined ? Plasmoid.configuration.miniVisColorMode : 0
-    readonly property color cfgMiniVisCustomColor: Qt.color(Plasmoid.configuration.miniVisCustomColor || "#38bdf8")
+    readonly property color cfgMiniVisCustomColor: root.parseKConfigColor(Plasmoid.configuration.miniVisCustomColor, "#38bdf8")
     readonly property int cfgMiniVisBarWidth: Plasmoid.configuration.miniVisBarWidth !== undefined ? Plasmoid.configuration.miniVisBarWidth : 2
     readonly property int cfgMiniVisSpacing: Plasmoid.configuration.miniVisSpacing !== undefined ? Plasmoid.configuration.miniVisSpacing : 2
     readonly property int cfgMiniVisHeight: {
@@ -203,9 +214,9 @@ PlasmoidItem {
         if (root.eyePillVisible && root.eyeState === "break") return 220;
         if (root.activeTimerAlertPill) return 210;
         if (root.showPillLyrics) {
-            // Tight auto-width hugging: 14 (music icon) + 8 (spacing) + text + (miniVisualizer if active) + 24 (left 12 + right 12)
-            var iconW = 14;
-            var gap = 8;
+            // Tight auto-width hugging: icon + spacing + text + (miniVisualizer if active) + 24 (left 12 + right 12)
+            var iconW = root.cfgMiniMusicIconEnabled ? root.cfgMiniMusicIconSize : 0;
+            var gap = root.cfgMiniMusicIconEnabled ? 8 : 0;
             var visW = root.cfgShowCompactVisualizer ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 8) : 0;
             var textW = Math.ceil(pillLyricsMetrics.advanceWidth);
             var padding = 24;
@@ -215,8 +226,8 @@ PlasmoidItem {
         if (root.timerPillVisible) return 200;
         if (root.eyePillVisible) return 200;
         var miniVisW = (root.cfgShowVisualizer) ? (root.cfgMiniVisBarWidth * 4 + root.cfgMiniVisSpacing * 3 + 12) : 0;
-        var musicIconExtraW = (root.cfgMiniMusicIconEnabled) ? Math.max(0, root.cfgMiniMusicIconSize - 12 + 6) : 0;
-        return root.isPlaying ? root.cfgCompactWidth + miniVisW + musicIconExtraW : root.cfgCompactWidth;
+        var musicIconExtraW = (root.cfgMiniMusicIconEnabled) ? Math.max(0, root.cfgMiniMusicIconSize - 12 + 6) : -14;
+        return root.isPlaying ? Math.max(160, root.cfgCompactWidth + miniVisW + musicIconExtraW) : root.cfgCompactWidth;
     }
 
     readonly property int currentNotchWidth: {
@@ -978,23 +989,47 @@ PlasmoidItem {
     property int lastKnownRamPct: 45
     property int lastKnownTemp: 42
 
-    readonly property int sysCpuPct: {
-        if (typeof cpuSensor !== "undefined" && cpuSensor.value !== undefined && !isNaN(cpuSensor.value) && cpuSensor.value > 0) {
-            root.lastKnownCpuPct = Math.round(cpuSensor.value);
+    property int sysCpuPct: lastKnownCpuPct
+    property int sysRamPct: lastKnownRamPct
+    property int sysTemp: lastKnownTemp
+
+    Connections {
+        target: (typeof cpuSensor !== "undefined") ? cpuSensor : null
+        function onValueChanged() {
+            if (cpuSensor && cpuSensor.value !== undefined && !isNaN(cpuSensor.value) && cpuSensor.value > 0) {
+                var v = Math.round(cpuSensor.value);
+                if (root.sysCpuPct !== v) {
+                    root.sysCpuPct = v;
+                    root.lastKnownCpuPct = v;
+                }
+            }
         }
-        return root.lastKnownCpuPct;
     }
-    readonly property int sysRamPct: {
-        if (typeof ramSensor !== "undefined" && ramSensor.value !== undefined && !isNaN(ramSensor.value) && ramSensor.value > 0) {
-            root.lastKnownRamPct = Math.round(ramSensor.value);
+
+    Connections {
+        target: (typeof ramSensor !== "undefined") ? ramSensor : null
+        function onValueChanged() {
+            if (ramSensor && ramSensor.value !== undefined && !isNaN(ramSensor.value) && ramSensor.value > 0) {
+                var v = Math.round(ramSensor.value);
+                if (root.sysRamPct !== v) {
+                    root.sysRamPct = v;
+                    root.lastKnownRamPct = v;
+                }
+            }
         }
-        return root.lastKnownRamPct;
     }
-    readonly property int sysTemp: {
-        if (typeof tempSensor !== "undefined" && tempSensor.value !== undefined && !isNaN(tempSensor.value) && tempSensor.value > 0) {
-            root.lastKnownTemp = Math.round(tempSensor.value);
+
+    Connections {
+        target: (typeof tempSensor !== "undefined") ? tempSensor : null
+        function onValueChanged() {
+            if (tempSensor && tempSensor.value !== undefined && !isNaN(tempSensor.value) && tempSensor.value > 0) {
+                var v = Math.round(tempSensor.value);
+                if (root.sysTemp !== v) {
+                    root.sysTemp = v;
+                    root.lastKnownTemp = v;
+                }
+            }
         }
-        return root.lastKnownTemp;
     }
     property int sysBatteryPct: 100
     property bool sysBatteryCharging: false
@@ -1503,13 +1538,16 @@ PlasmoidItem {
 
     function getHostScreen() {
         var screenList = (typeof Application !== "undefined" && Application.screens) ? Application.screens : (Qt.application ? Qt.application.screens : []);
+        if (!screenList || screenList.length === 0) return null;
         var targetName = (root.Screen && root.Screen.name) ? root.Screen.name : (root.Window.window && root.Window.window.screen ? root.Window.window.screen.name : "");
-        for (var i = 0; i < screenList.length; i++) {
-            if (screenList[i].name === targetName) {
-                return screenList[i];
+        if (targetName) {
+            for (var i = 0; i < screenList.length; i++) {
+                if (screenList[i] && screenList[i].name === targetName) {
+                    return screenList[i];
+                }
             }
         }
-        return (root.Window.window && root.Window.window.screen) ? root.Window.window.screen : null;
+        return (root.Window.window && root.Window.window.screen) ? root.Window.window.screen : (screenList.length > 0 ? screenList[0] : null);
     }
 
     function openNotch(targetTabIndex) {
@@ -1727,7 +1765,7 @@ PlasmoidItem {
     // ==============================================================
     Window {
         id: expandedDialog
-        screen: root.getHostScreen()
+        screen: root.dialogSurfaceOpen ? root.getHostScreen() : null
         width: 720
         height: 520
         color: "transparent"
@@ -1740,8 +1778,14 @@ PlasmoidItem {
         LayerShellQt.Window.exclusionZone: -1
         LayerShellQt.Window.keyboardInteractivity: LayerShellQt.Window.KeyboardInteractivityOnDemand
         LayerShellQt.Window.screenConfiguration: LayerShellQt.Window.ScreenFromQWindow
-        LayerShellQt.Window.screen: (root.Window.window && root.Window.window.screenToFollow) ? root.Window.window.screenToFollow : null
+        LayerShellQt.Window.screen: (root.dialogSurfaceOpen && root.Window.window && root.Window.window.screenToFollow) ? root.Window.window.screenToFollow : null
         LayerShellQt.Window.wantsToBeOnActiveScreen: false
+
+        onScreenChanged: {
+            if (!screen && root.dialogSurfaceOpen) {
+                root.triggerCollapseSequence();
+            }
+        }
 
         onActiveChanged: {
             if (!active && root.isExpanded && !expandedCardPanel.isClosing && !expandedCardPanel.isOpening) {

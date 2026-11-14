@@ -58,28 +58,33 @@ Item {
     property var defaultSink: null
 
     function updateDefaultSink() {
-        if (!sinkModel || sinkModel.count === 0) return;
+        if (!sinkModel || sinkModel.count === 0) {
+            defaultSink = null;
+            return;
+        }
         var defaultRole = sinkModel.role("Default");
         var pulseObjectRole = sinkModel.role("PulseObject");
+        var foundSink = null;
         for (var i = 0; i < sinkModel.count; ++i) {
             var idx = sinkModel.index(i, 0);
             var isDef = (defaultRole !== -1) ? sinkModel.data(idx, defaultRole) : false;
             if (isDef === true || isDef === 1 || isDef === "true") {
-                defaultSink = (pulseObjectRole !== -1) ? sinkModel.data(idx, pulseObjectRole) : null;
-                return;
+                foundSink = (pulseObjectRole !== -1) ? sinkModel.data(idx, pulseObjectRole) : null;
+                break;
             }
         }
-        if (sinkModel.count > 0 && !defaultSink && pulseObjectRole !== -1) {
-            defaultSink = sinkModel.data(sinkModel.index(0, 0), pulseObjectRole);
+        if (!foundSink && sinkModel.count > 0 && pulseObjectRole !== -1) {
+            foundSink = sinkModel.data(sinkModel.index(0, 0), pulseObjectRole);
         }
+        defaultSink = foundSink;
     }
 
-    readonly property real normalVolume: (defaultSink && defaultSink.baseVolume > 0) ? defaultSink.baseVolume : 65536
-    readonly property real currentVolumePercent: defaultSink 
+    readonly property real normalVolume: (defaultSink && typeof defaultSink === "object" && defaultSink.baseVolume > 0) ? defaultSink.baseVolume : 65536
+    readonly property real currentVolumePercent: (defaultSink && typeof defaultSink === "object" && defaultSink.volume !== undefined) 
         ? Math.round((defaultSink.volume / normalVolume) * 100) 
         : 0
     readonly property int currentVolumePct: currentVolumePercent
-    readonly property bool isMuted: defaultSink ? defaultSink.muted : false
+    readonly property bool isMuted: (defaultSink && typeof defaultSink === "object" && defaultSink.muted !== undefined) ? defaultSink.muted : false
 
     function setVolumePercent(val) {
         if (!defaultSink) return;
