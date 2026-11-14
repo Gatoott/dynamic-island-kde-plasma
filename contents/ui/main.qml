@@ -1576,14 +1576,14 @@ PlasmoidItem {
 
         // Fallback jika pengukuran runtime tidak valid atau belum siap
         if (pillY === -9999 || isNaN(pillY) || pillY < -200 || pillY > 500) {
-            pillY = root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset);
+            pillY = root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : root.effectiveVerticalOffset;
         }
 
-        // Validasi batas agar kartu tidak keluar layar
+        // Simpan posisi nyata pill
         if (root.isFloatingStyle) {
             measuredPillTop = Math.max(0, pillY);
         } else {
-            measuredPillTop = Math.min(0, pillY);
+            measuredPillTop = pillY;
         }
 
         console.warn("[NOTCH_OFFSET] Mode: " + (root.isFloatingStyle ? "floating" : "docked")
@@ -1596,9 +1596,11 @@ PlasmoidItem {
         return measuredPillTop;
     }
 
-    readonly property int effectiveCardTopMargin: root.isFloatingStyle 
-        ? root.measuredPillTop 
-        : Math.min(0, root.effectiveVerticalOffset)
+    readonly property int effectiveCardTopMargin: Math.max(0, root.measuredPillTop)
+
+    // Tinggi efektif compact pill yang tampak di layar (px).
+    // Jika pill menjorok ke luar atas layar (measuredPillTop < 0), tinggi awal disesuaikan agar tepi bawah sejajar dengan pillBottom
+    readonly property int effectiveCompactHeight: Math.max(1, (root.measuredPillTop + root.cfgCompactHeight) - root.effectiveCardTopMargin)
 
     onEffectiveVerticalOffsetChanged: root.updateMeasuredPillTop()
     onIsFloatingStyleChanged: root.updateMeasuredPillTop()
@@ -1641,7 +1643,7 @@ PlasmoidItem {
 
         // Ambil dimensi kapsul standby saat ini persis sebelum tab/status notifikasi diubah
         var startW = (root.inPanel && panelCompactNotch.width > 0) ? panelCompactNotch.width : root.currentCompactWidth;
-        var startH = root.cfgCompactHeight;
+        var startH = root.inPanel ? root.effectiveCompactHeight : root.cfgCompactHeight;
 
         // 1. Reset state penutup & pastikan tab aktif benar
         card.isClosing = false;
@@ -1906,7 +1908,7 @@ PlasmoidItem {
                 anchors.horizontalCenterOffset: root.cfgHorizontalOffset
                 isOverlayDialog: true
                 compactWidth: root.currentCompactWidth
-                compactHeight: root.cfgCompactHeight
+                compactHeight: root.effectiveCompactHeight
                 isExpanded: root.inPanel && root.isExpanded
                 notchStyle: root.cfgNotchStyle
                 islandShapeMode: root.cfgIslandShapeMode
@@ -2057,7 +2059,7 @@ PlasmoidItem {
         id: desktopLivingNotch
         visible: !root.inPanel
         anchors.top: parent.top
-        anchors.topMargin: root.isFloatingStyle ? Math.max(0, root.effectiveVerticalOffset) : Math.min(0, root.effectiveVerticalOffset)
+        anchors.topMargin: root.effectiveCardTopMargin
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.horizontalCenterOffset: root.cfgHorizontalOffset
 
