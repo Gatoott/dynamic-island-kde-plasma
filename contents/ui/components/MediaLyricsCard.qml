@@ -1022,16 +1022,16 @@ Item {
                     height: lyricText.implicitHeight + 8
 
                     readonly property int lineDiff: mediaCardRoot.currentLyricIndex >= 0 ? (index - mediaCardRoot.currentLyricIndex) : 0
-                    readonly property bool isCurrent: lineDiff === 0
-                    readonly property bool isPast: lineDiff < 0
+                    readonly property int dist: mediaCardRoot.currentLyricIndex >= 0 ? Math.abs(index - mediaCardRoot.currentLyricIndex) : 0
+                    readonly property bool isCurrent: mediaCardRoot.currentLyricIndex >= 0 && dist === 0
 
-                    // Blur bertingkat Apple Music: baris aktif & lampau tajam,
-                    // baris mendatang di bawahnya makin jauh makin blur
+                    // Blur simetris bertingkat gaya Apple Music: baris aktif tajam,
+                    // baris lampau (di atas) dan mendatang (di bawah) makin jauh makin blur
                     readonly property real rawBlur: {
-                        if (isCurrent || isPast) return 0.0;
-                        if (lineDiff === 1) return 0.20;
-                        if (lineDiff === 2) return 0.42;
-                        if (lineDiff === 3) return 0.65;
+                        if (mediaCardRoot.currentLyricIndex < 0 || dist === 0) return 0.0;
+                        if (dist === 1) return 0.20;
+                        if (dist === 2) return 0.42;
+                        if (dist === 3) return 0.65;
                         return 0.85;
                     }
                     property real animatedBlur: rawBlur
@@ -1039,14 +1039,13 @@ Item {
                         NumberAnimation { duration: 220; easing.type: Easing.OutQuad }
                     }
 
-                    // Warna redup bertingkat: baris aktif #ffffff, baris lampau 0.35,
-                    // baris mendatang makin jauh makin redup
+                    // Warna redup simetris: baris aktif #ffffff,
+                    // makin jauh dari baris aktif (atas & bawah) makin redup
                     readonly property color targetColor: {
-                        if (isCurrent) return "#ffffff";
-                        if (isPast) return Qt.rgba(1, 1, 1, 0.35);
-                        if (lineDiff === 1) return Qt.rgba(1, 1, 1, 0.65);
-                        if (lineDiff === 2) return Qt.rgba(1, 1, 1, 0.45);
-                        if (lineDiff === 3) return Qt.rgba(1, 1, 1, 0.28);
+                        if (mediaCardRoot.currentLyricIndex < 0 || dist === 0) return "#ffffff";
+                        if (dist === 1) return Qt.rgba(1, 1, 1, 0.65);
+                        if (dist === 2) return Qt.rgba(1, 1, 1, 0.45);
+                        if (dist === 3) return Qt.rgba(1, 1, 1, 0.28);
                         return Qt.rgba(1, 1, 1, 0.15);
                     }
 
