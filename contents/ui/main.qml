@@ -1260,6 +1260,14 @@ PlasmoidItem {
         function dbusSetLyrics(show) {
             root.showLyrics = Boolean(show);
         }
+
+        function dbusSetTab(tabIndex) {
+            var card = root.inPanel ? expandedCardPanel : desktopLivingNotch;
+            var count = card.availableTabs.length;
+            if (count > 0) {
+                card.requestSwitchTab(((tabIndex % count) + count) % count);
+            }
+        }
     }
 
     DBus.Properties {

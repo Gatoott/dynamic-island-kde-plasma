@@ -684,8 +684,8 @@ Item {
         anchors.fill: parent
         anchors.topMargin: 12
         anchors.bottomMargin: 12
-        anchors.leftMargin: 38
-        anchors.rightMargin: 38
+        anchors.leftMargin: 40
+        anchors.rightMargin: 40
         visible: mediaCardRoot.showLyrics
         clip: true
 
@@ -1086,6 +1086,14 @@ Item {
                             }
                         }
                     }
+                }
+
+                Component.onCompleted: {
+                    Qt.callLater(() => {
+                        if (currentIndex >= 0 && currentIndex < count) {
+                            positionViewAtIndex(currentIndex, ListView.Center);
+                        }
+                    });
                 }
 
                 delegate: Item {

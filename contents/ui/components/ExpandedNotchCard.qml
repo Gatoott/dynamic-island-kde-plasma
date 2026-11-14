@@ -1006,10 +1006,13 @@ Item {
                 anchors.leftMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !(unifiedNotchRoot.activeTabKey === "media" && unifiedNotchRoot.showLyrics)
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
                 color: leftNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
 
                 SFSymbolIcon {
                     anchors.centerIn: parent
@@ -1044,10 +1047,13 @@ Item {
                 anchors.rightMargin: 8
                 anchors.verticalCenter: parent.verticalCenter
                 z: 10
-                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1 && !(unifiedNotchRoot.activeTabKey === "media" && unifiedNotchRoot.showLyrics)
+                visible: unifiedNotchRoot.isExpanded && !unifiedNotchRoot.isMorphing && unifiedNotchRoot.availableTabs.length > 1
                 color: rightNavMa.containsMouse ? Qt.rgba(1, 1, 1, 0.24) : Qt.rgba(1, 1, 1, 0.08)
                 border.width: 1
                 border.color: Qt.rgba(1, 1, 1, 0.14)
+
+                Behavior on color { ColorAnimation { duration: 150 } }
+                Behavior on border.color { ColorAnimation { duration: 150 } }
 
                 SFSymbolIcon {
                     anchors.centerIn: parent

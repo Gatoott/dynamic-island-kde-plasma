@@ -141,6 +141,15 @@ class VisualizerService(dbus.service.Object):
         self.SetLyrics(bool(show))
         return True
 
+    @dbus.service.signal(IFACE, signature="i")
+    def SetTab(self, tab):
+        pass
+
+    @dbus.service.method(IFACE, in_signature="i", out_signature="b")
+    def RequestTab(self, tab):
+        self.SetTab(int(tab))
+        return True
+
     @dbus.service.signal(dbus.PROPERTIES_IFACE, signature="sa{sv}as")
     def PropertiesChanged(self, interface_name, changed_properties, invalidated_properties):
         pass
